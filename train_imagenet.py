@@ -12,7 +12,7 @@ from synset import *
 from image_processing import image_preprocessing
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_train',
+tf.app.flags.DEFINE_string('data_dir', './data/IMAGES',
                            'imagenet dir')
 
 
