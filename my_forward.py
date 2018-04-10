@@ -1,8 +1,33 @@
-from convert import print_prob, load_image, checkpoint_fn, meta_fn
+#from convert import print_prob, load_image, checkpoint_fn, meta_fn
 import tensorflow as tf
 import json
 import os
 import numpy as np
+
+
+
+# returns image of shape [224, 224, 3]
+# [height, width, depth]
+def load_image(path, size=224):
+    img = skimage.io.imread(path)
+    short_edge = min(img.shape[:2])
+    yy = int((img.shape[0] - short_edge) / 2)
+    xx = int((img.shape[1] - short_edge) / 2)
+    crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
+    resized_img = skimage.transform.resize(crop_img, (size, size))
+    return resized_img
+
+
+def checkpoint_fn(layers):
+    return 'ResNet-L%d.ckpt' % layers
+
+
+def meta_fn(layers):
+    return 'ResNet-L%d.meta' % layers
+
+
+
+
 
 layers = 152
 
@@ -11,7 +36,7 @@ sess = tf.Session()
 new_saver = tf.train.import_meta_graph(meta_fn(layers))
 new_saver.restore(sess, checkpoint_fn(layers))
 
-dir = "/home/giuseppe/Desktop/flower_photos"
+dir = "../Data/Images_Plans"
 listimgs = list()
 for path, subdirs, files in os.walk(dir):
 	for name in files:
