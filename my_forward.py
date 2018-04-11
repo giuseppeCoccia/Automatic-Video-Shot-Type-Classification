@@ -2,8 +2,9 @@ import tensorflow as tf
 import json
 import os
 import numpy as np
-import skimage.io
-import skimage.transform
+#import skimage.io
+#import skimage.transform
+import cv2
 
 
 
@@ -12,12 +13,14 @@ import skimage.transform
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
 def load_image(path, size=224):
-    img = skimage.io.imread(path)
+    #img = skimage.io.imread(path)
+    img = cv2.imread(path)
     short_edge = min(img.shape[:2])
     yy = int((img.shape[0] - short_edge) / 2)
     xx = int((img.shape[1] - short_edge) / 2)
     crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
-    resized_img = skimage.transform.resize(crop_img, (size, size))
+    #resized_img = skimage.transform.resize(crop_img, (size, size))
+    resized_img = cv2.resize(crop_img, (size, size))
     return resized_img
 
 # used to load the pretrained model
@@ -46,7 +49,7 @@ def loss(logits, labels):
 ##### LOAD IMAGES ######
 
 # read images
-dir = "/home/paolomoriello/flower_photos"
+dir = "../Data/Images_Plans"
 listimgs = list()
 for path, subdirs, files in os.walk(dir):
 	for name in files:
