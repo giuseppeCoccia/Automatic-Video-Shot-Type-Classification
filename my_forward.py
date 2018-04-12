@@ -32,6 +32,7 @@ def checkpoint_fn(layers):
 def meta_fn(layers):
     return 'ResNet-L%d.meta' % layers
 
+# cross entropy loss, as it is a classification problem it is better
 def loss(logits, labels):
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, labels)
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
@@ -44,7 +45,8 @@ def loss(logits, labels):
     return loss_
 
 def categories_number(path):
-    return sum(os.path.isdir(i) for i in os.listdir(path))-2
+    return len(os.listdir(path))-2
+    #return sum(os.path.isdir(i) for i in os.listdir(path))-2
 
 
 ### START EXECUTION
@@ -53,6 +55,7 @@ def categories_number(path):
 
 # read images
 dir = "../Data/Images_Plans"
+
 listimgs = list()
 for path, subdirs, files in os.walk(dir):
 	for name in files:
@@ -98,19 +101,22 @@ print('File save completed')
 
 
 num_categories = categories_number(dir)
-num_units_in = features_tensor.get_shape()[1]
+#num_units_in = features_tensor.get_shape()[1]
+batch_size, num_units_in = features_tensor.get_shape().as_list()
 
-input = tf.placeholder(np.float32, name='input') # define the input tensor
+bottleneck_input = tf.placeholder(features_tensor, shape=[batch_size, num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
 
 weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
-weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer, weight_decay=FC_WEIGHT_STDDEV)
+weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
 biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
 
-op1 = tf.matmul(input, weights)
+logits = tf.matmul(bottleneck_input, weights)+biases
 
-x = tf.nn.xw_plus_b(x, weights, biases)
+#x = tf.nn.xw_plus_b(features_tensor, weights, biases)
+final_tensor = tf.nn.softmax(logits, name="final_tensor")
 
-loss_ = loss(logits, input)
+labelsVar = tf.placeholder(tf.int64, shape=[batch_size], name='labelsVar')
+loss_ = loss(logits, labelsVar)
 global_step = tf.Variable(0, name='global_step', trainable=False)
 ops = tf.train.AdamOptimizer(learning_rate=0.001)
 train_op = ops.minimize(loss_, global_step=global_step)
