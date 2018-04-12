@@ -42,6 +42,8 @@ def loss(logits, labels):
     
     return loss_
 
+def categories_number(path):
+    return sum(os.path.isdir(i) for i in os.listdir(path))-2
 
 
 ### START EXECUTION
@@ -94,7 +96,7 @@ with open(filename, "w") as f:
 print('File save completed')
 
 
-num_categories = ...
+num_categories = categories_number(dir)
 num_units_in = features_tensor.get_shape()[1]
 
 input = tf.placeholder(np.float32, name='input') # define the input tensor
