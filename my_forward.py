@@ -2,8 +2,6 @@ import tensorflow as tf
 import json
 import os
 import numpy as np
-#import skimage.io
-#import skimage.transform
 import cv2
 
 
@@ -100,6 +98,8 @@ num_categories = categories_number(dir)
 num_units_in = features_tensor.get_shape()[1]
 
 input = tf.placeholder(np.float32, name='input') # define the input tensor
+
+weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
 weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer, weight_decay=FC_WEIGHT_STDDEV)
 biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
 
