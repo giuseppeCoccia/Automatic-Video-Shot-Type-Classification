@@ -5,6 +5,9 @@ import numpy as np
 import cv2
 
 
+FC_WEIGHT_STDDEV = 0.01
+
+
 
 ##### UTILS #####
 
