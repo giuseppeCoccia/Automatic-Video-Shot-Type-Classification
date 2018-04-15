@@ -137,3 +137,7 @@ sess.run(init)
 
 sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices[0]})
 
+
+tf.train.export_meta_graph(filename='tmp_model.meta')
+saver = tf.train.Saver()
+save_path = saver.save(sess, "tmp_model.ckpt")
