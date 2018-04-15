@@ -70,7 +70,7 @@ print('Completed loading images names')
 loaded_imgs = []
 for image in listimgs:
 	img = load_image(image)
-	batch = img.reshape((1, 224, 224, 3))
+	batch = img.reshape((224, 224, 3))
 	loaded_imgs.append(batch)
 print('Completed loading images')
 
@@ -88,7 +88,7 @@ new_saver.restore(sess, checkpoint_fn(layers))
 graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
 images = graph.get_tensor_by_name("images:0")
-feed_dict = {images: loaded_imgs[0]}
+feed_dict = {images: loaded_imgs}
 features = sess.run(features_tensor, feed_dict=feed_dict) # Run the ResNet on loaded images
 print('Completed running ResNet')
 
