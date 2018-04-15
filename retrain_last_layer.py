@@ -34,13 +34,13 @@ def meta_fn(layers):
 
 # cross entropy loss, as it is a classification problem it is better
 def loss(logits, labels):
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, labels)
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
     
     regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     
     loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
-    tf.scalar_summary('loss', loss_)
+    tf.summary.scalar('loss', loss_)
     
     return loss_
 
@@ -103,14 +103,16 @@ print('File save completed')
 num_categories = categories_number(dir)
 #num_units_in = features_tensor.get_shape()[1]
 batch_size, num_units_in = features_tensor.get_shape().as_list()
+#print(batch_size, num_units_in)
 
-bottleneck_input = tf.placeholder(features_tensor, shape=[batch_size, num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
+
+bottleneck_input = tf.placeholder(tf.int64, shape=(batch_size,num_units_in), name='BottleneckInputPlaceholder') # define the input tensor
 
 weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
 weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
 biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
 
-logits = tf.matmul(bottleneck_input, weights)+biases
+logits = tf.matmul(features_tensor, weights)+biases
 
 #x = tf.nn.xw_plus_b(features_tensor, weights, biases)
 final_tensor = tf.nn.softmax(logits, name="final_tensor")
@@ -120,3 +122,11 @@ loss_ = loss(logits, labelsVar)
 global_step = tf.Variable(0, name='global_step', trainable=False)
 ops = tf.train.AdamOptimizer(learning_rate=0.001)
 train_op = ops.minimize(loss_, global_step=global_step)
+
+sess = tf.InteractiveSession()
+tf.global_variables_initializer().run()
+# Train
+#for _ in range(1000):
+#    batch_xs, batch_ys = mnist.train.next_batch(100)
+sess.run(train_op, feed_dict={bottleneck_input: features_tensor, labelsVar: 'boh'})
+
