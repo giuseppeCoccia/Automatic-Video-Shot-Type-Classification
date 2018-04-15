@@ -62,7 +62,7 @@ for path, subdirs, files in os.walk(dir):
 	for name in files:
 		if ".jpg" in name:
 			listimgs.append(os.path.join(path, name))
-            listlabels.append(path)
+			listlabels.append(path)
 print('Completed loading images names')
 print(listlabels)
 
