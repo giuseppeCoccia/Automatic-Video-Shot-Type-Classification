@@ -57,11 +57,14 @@ def categories_number(path):
 dir = "../Data/Images_Plans"
 
 listimgs = list()
+listlabels = list()
 for path, subdirs, files in os.walk(dir):
 	for name in files:
 		if ".jpg" in name:
 			listimgs.append(os.path.join(path, name))
+            listlabels.append(path)
 print('Completed loading images names')
+print(listlabels)
 
 # load images
 loaded_imgs = []
