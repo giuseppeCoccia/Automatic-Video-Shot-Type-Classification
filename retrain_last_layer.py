@@ -92,6 +92,9 @@ feed_dict = {images: loaded_imgs}
 features = sess.run(features_tensor, feed_dict=feed_dict) # Run the ResNet on loaded images
 print('Completed running ResNet')
 
+print('Read', len(features), 'features')
+
+
 # save file
 filename = "img_features.json"
 with open(filename, "w") as f:
@@ -110,7 +113,8 @@ u,indices = np.unique(np.array(listlabels), return_inverse=True)
 
 num_categories = len(u)
 # get avg pool dimensions
-batch_size, num_units_in = features_tensor.get_shape().as_list()
+_, num_units_in = features_tensor.get_shape().as_list()
+batch_size = len(features)
 
 # define placeholder that will contain the inputs of the new layer
 bottleneck_input = tf.placeholder(tf.float32, shape=[batch_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
@@ -126,7 +130,7 @@ logits = tf.nn.bias_add(logits, biases)
 #final_tensor = tf.nn.softmax(logits, name="final_tensor")
 
 labelsVar = tf.placeholder(tf.int32, shape=(batch_size), name='labelsVar')
-loss_ = loss(logits[0], labelsVar)
+loss_ = loss(logits, labelsVar)
 #global_step = tf.Variable(0, name='global_step', trainable=False)
 ops = tf.train.AdamOptimizer(learning_rate=0.001)
 train_op = ops.minimize(loss_)#, global_step=global_step)
@@ -135,7 +139,7 @@ sess = tf.Session()
 init=tf.global_variables_initializer()
 sess.run(init)
 
-sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices[0]})
+sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
 
 
 tf.train.export_meta_graph(filename='tmp_model.meta')
