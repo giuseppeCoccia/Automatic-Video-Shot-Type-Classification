@@ -64,7 +64,7 @@ for path, subdirs, files in os.walk(dir):
 			listimgs.append(os.path.join(path, name))
 			listlabels.append(path.split('/')[-1])
 print('Completed loading images names')
-print(listlabels)
+
 
 # load images
 loaded_imgs = []
@@ -88,10 +88,11 @@ new_saver.restore(sess, checkpoint_fn(layers))
 graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
 images = graph.get_tensor_by_name("images:0")
+#images_placeholder = tf.placeholder_with_default(images, shape=(1,224,224,3), name='ImagesPlaceholder')
+#feed_dict = {images_placeholder: loaded_imgs[0]}
 feed_dict = {images: loaded_imgs[0]}
 features = sess.run(features_tensor, feed_dict=feed_dict) # Run the ResNet on loaded images
 print('Completed running ResNet')
-
 
 # save file
 filename = "img_features.json"
@@ -104,18 +105,17 @@ print('File save completed')
 
 
 num_categories = categories_number(dir)
-#num_units_in = features_tensor.get_shape()[1]
 batch_size, num_units_in = features_tensor.get_shape().as_list()
 #print(batch_size, num_units_in)
 
 
-bottleneck_input = tf.placeholder(tf.int64, shape=(batch_size,num_units_in), name='BottleneckInputPlaceholder') # define the input tensor
+bottleneck_input = tf.placeholder_with_default(features_tensor, shape=(batch_size,num_units_in), name='BottleneckInputPlaceholder') # define the input tensor
 
 weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
 weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
 biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
 
-logits = tf.matmul(features_tensor, weights)+biases
+logits = tf.matmul(bottleneck_input, weights)+biases
 
 #x = tf.nn.xw_plus_b(features_tensor, weights, biases)
 final_tensor = tf.nn.softmax(logits, name="final_tensor")
@@ -131,5 +131,6 @@ tf.global_variables_initializer().run()
 # Train
 #for _ in range(1000):
 #    batch_xs, batch_ys = mnist.train.next_batch(100)
-sess.run(train_op, feed_dict={bottleneck_input: features_tensor, labelsVar: 'boh'})
+u,indices = np.unique(np.array(listlabels), return_inverse=True)
+sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
 
