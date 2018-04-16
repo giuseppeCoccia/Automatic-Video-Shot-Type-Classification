@@ -44,9 +44,19 @@ def loss(logits, labels):
     
     return loss_
 
-def categories_number(path):
-    return len(os.listdir(path))-2
-    #return sum(os.path.isdir(i) for i in os.listdir(path))-2
+
+def read_images(dir):
+     listimgs = list()
+     listlabels = list()
+     for path, subdirs, files in os.walk(dir):
+          for name in files:
+               if ".jpg" in name:
+                    listimgs.append(os.path.join(path, name))
+                    listlabels.append(path.split('/')[-1])
+     return listimgs, listlabels
+
+
+
 
 
 ### START EXECUTION
@@ -54,15 +64,15 @@ def categories_number(path):
 ##### LOAD IMAGES ######
 
 # read images
-dir = "../Data/Images_Plans"
-
-listimgs = list()
-listlabels = list()
-for path, subdirs, files in os.walk(dir):
-	for name in files:
-		if ".jpg" in name:
-			listimgs.append(os.path.join(path, name))
-			listlabels.append(path.split('/')[-1])
+base_dir = "../Data/Images_Plans/"
+#listimgs, listlabels = read_images(base_dir)
+listimgs, listlabels = read_images(base_dir+"Gros plan")
+a, b = read_images(base_dir+"Plan moyen")
+listimgs += a
+listlabels += b
+a, b = read_images(base_dir+"Plan rapproche")
+listimgs += a
+listlabels += b
 print('Completed loading images names')
 
 
@@ -73,7 +83,7 @@ for image in listimgs:
 	batch = img.reshape((224, 224, 3))
 	loaded_imgs.append(batch)
 print('Completed loading images')
-
+print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
 
 
@@ -140,7 +150,7 @@ init=tf.global_variables_initializer()
 sess.run(init)
 
 sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
-
+print("Completed training")
 
 tf.train.export_meta_graph(filename='tmp_model.meta')
 saver = tf.train.Saver()
