@@ -76,6 +76,7 @@ listlabels += b
 print('Completed loading images names')
 
 
+
 # load images
 loaded_imgs = []
 for image in listimgs:
@@ -87,8 +88,11 @@ print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
 
 
+
+
 ##### MODEL #####
 layers = 152
+
 
 sess = tf.Session()
 
@@ -116,18 +120,21 @@ print('File save completed')
 
 
 
+# retrain model
 
+# map string labels to unique integers
 u,indices = np.unique(np.array(listlabels), return_inverse=True)
-
-
-
 num_categories = len(u)
-# get avg pool dimensions
-_, num_units_in = features_tensor.get_shape().as_list()
 batch_size = len(features)
+
+# get avg pool dimensions
+batch_size, num_units_in = features_tensor.get_shape().as_list()
 
 # define placeholder that will contain the inputs of the new layer
 bottleneck_input = tf.placeholder(tf.float32, shape=[batch_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
+# define placeholder for the categories
+labelsVar = tf.placeholder(tf.int32, shape=(batch_size), name='labelsVar')
+
 
 # weights and biases
 weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
@@ -137,14 +144,13 @@ biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_
 logits = tf.matmul(bottleneck_input, weights)
 logits = tf.nn.bias_add(logits, biases)
 
-#final_tensor = tf.nn.softmax(logits, name="final_tensor")
+final_tensor = tf.nn.softmax(logits, name="final_result")
 
-labelsVar = tf.placeholder(tf.int32, shape=(batch_size), name='labelsVar')
 loss_ = loss(logits, labelsVar)
-#global_step = tf.Variable(0, name='global_step', trainable=False)
-ops = tf.train.AdamOptimizer(learning_rate=0.001)
-train_op = ops.minimize(loss_)#, global_step=global_step)
+ops = tf.train.AdamOptimizer(learning_rate=0.01)
+train_op = ops.minimize(loss_)
 
+# run training session
 sess = tf.Session()
 init=tf.global_variables_initializer()
 sess.run(init)
@@ -152,6 +158,17 @@ sess.run(init)
 sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
 print("Completed training")
 
-tf.train.export_meta_graph(filename='tmp_model.meta')
-saver = tf.train.Saver()
-save_path = saver.save(sess, "tmp_model.ckpt")
+
+
+# saving new model
+#tf.train.export_meta_graph(filename='tmp_model.meta')
+#saver = tf.train.Saver()
+#save_path = saver.save(sess, "tmp_model.ckpt")
+
+# test the model
+img = load_image(listimgs[30])
+batch = img.reshape((1, 224, 224, 3))
+
+features = sess.run(features_tensor, feed_dict = {images: batch})
+prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+print(prob[0])
