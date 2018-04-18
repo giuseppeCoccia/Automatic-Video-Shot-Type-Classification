@@ -16,4 +16,4 @@ pixels = int(sys.argv[2])
 for i in range(pixels):
     for j in range(pixels):
         new_img = img[i:len_y, j:len_x]
-        cv2.imwrite(output_dir+'cropped_'+str(i)+str(j)+'_'+img_name, new_img)
+        cv2.imwrite(output_dir+'cropped_'+str(i)+str(j)+'_'+img_name.split("/")[-1], new_img)
