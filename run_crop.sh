@@ -6,8 +6,8 @@ pixels=7
 
 for d in $directories
 do
-	files=$(find $d -type f)
-	label=$(basename $d)
+	files=$(find "$d" -type f)
+	label=$(basename "$d")
 
 	newdir="$1${base_label}_${label}/"
 	mkdir $newdir
@@ -15,6 +15,6 @@ do
 	for img in $files
 	do
 		echo $img
-		python crop_image_grid.py $img $pixels $newdir
+		python3 crop_image_grid.py $img $pixels $newdir
 	done
 done
