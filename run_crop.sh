@@ -15,6 +15,6 @@ do
 	for img in $files
 	do
 		echo $img
-		python crop_image.py $img $pixels $newdir
+		python crop_image_grid.py $img $pixels $newdir
 	done
 done
