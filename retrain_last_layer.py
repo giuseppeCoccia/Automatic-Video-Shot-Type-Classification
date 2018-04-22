@@ -77,6 +77,7 @@ print('Completed loading images names')
 
 
 
+
 # load images
 loaded_imgs = []
 for image in listimgs:
@@ -124,6 +125,7 @@ print('File save completed')
 
 # map string labels to unique integers
 u,indices = np.unique(np.array(listlabels), return_inverse=True)
+print('Categories: ', u)
 num_categories = len(u)
 batch_size = len(features)
 
@@ -166,9 +168,11 @@ print("Completed training")
 #save_path = saver.save(sess, "tmp_model.ckpt")
 
 # test the model
-img = load_image(listimgs[30])
+# read images
+listimgs, listlabels = read_images(base_dir+"Tres gros plan")
+img = load_image(listimgs[0])
 batch = img.reshape((1, 224, 224, 3))
 
 features = sess.run(features_tensor, feed_dict = {images: batch})
 prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-print(prob[0])
+print(prob[0], "->", u[np.argwhere(prob[0])])
