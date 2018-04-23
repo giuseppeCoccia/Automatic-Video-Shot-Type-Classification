@@ -10,6 +10,4 @@ done
 #delete last char
 frames=${frames::-1}
 
-output_name=$(basename "$input")
-filename="${$output_name%.*}"
-ffmpeg -i $input_ -vf select=$frames -vsync 0 filename%d.jpg
+ffmpeg -i $input_ -vf select=$frames -vsync 0 "${input_%.*}_%d.jpg"
