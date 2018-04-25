@@ -47,7 +47,6 @@ frames = {}
 with open(file_, "r") as f:
 	for line in f:
 		words = line.split()
-		
 		frame = words[0]
 		x_top = int(words[1])
 		y_top = int(words[2])

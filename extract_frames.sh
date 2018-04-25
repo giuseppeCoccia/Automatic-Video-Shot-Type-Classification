@@ -5,6 +5,13 @@ output_=$2
 
 read frames_in
 echo $frames_in
+
+# if input is empty exit
+if [ -z $frames_in ]; then
+echo "No entry"
+exit 1
+fi
+
 frames=''
 #selected_string format: 'eq(n\,100)+eq(n\,184)+...'
 #for i in "${@:2}"
