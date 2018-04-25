@@ -69,10 +69,10 @@ with open(file_, "r") as f:
 			#extract_frames(key)
 			#frame_string += "eq(n\,"+key+")+" 	
 	#print("Mean:", sum(ratios)/len(ratios))
-	print(" ".join(str(x) for x in frms) for x in frms
-	ratios.sort()
-	#print(ratios)
-	
+	print(" ".join(str(x) for x in frms))
+	#ratios.sort()
+	#print(ratios)	
 	#print("Frame String:", frame_string[:-1])
 	#extract_frames(frame_string[:-1])
 	#extract_frames(frms)
+
