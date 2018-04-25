@@ -14,13 +14,11 @@ FC_WEIGHT_STDDEV = 0.01
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
 def load_image(path, size=224):
-    #img = skimage.io.imread(path)
     img = cv2.imread(path)
     short_edge = min(img.shape[:2])
     yy = int((img.shape[0] - short_edge) / 2)
     xx = int((img.shape[1] - short_edge) / 2)
     crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
-    #resized_img = skimage.transform.resize(crop_img, (size, size))
     resized_img = cv2.resize(crop_img, (size, size))
     return resized_img
 
@@ -44,7 +42,8 @@ def loss(logits, labels):
     
     return loss_
 
-
+# given path to dir, return all the images (and labels) from images of that dir
+# if there are subdirs, it goes into them (each subdir is a different label)
 def read_images(dir):
      listimgs = list()
      listlabels = list()
@@ -62,7 +61,6 @@ def read_images(dir):
 ### START EXECUTION
 
 ##### LOAD IMAGES ######
-
 # read images
 base_dir = "../Data/Images_Plans/"
 #listimgs, listlabels = read_images(base_dir)
@@ -92,25 +90,27 @@ print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
 
 ##### MODEL #####
-layers = 152
+# load from existing model and retrain last layer
+layers = 152 # model to be loaded
 
 
 sess = tf.Session()
 
+# restore model
 new_saver = tf.train.import_meta_graph(meta_fn(layers))
 new_saver.restore(sess, checkpoint_fn(layers))
-	
+# load last-but-one (layer) tensor after feeding images
 graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
 images = graph.get_tensor_by_name("images:0")
 feed_dict = {images: loaded_imgs}
 features = sess.run(features_tensor, feed_dict=feed_dict) # Run the ResNet on loaded images
-print('Completed running ResNet')
+print('Completed running ResNet') # features now containes avg_pool output
 
 print('Read', len(features), 'features')
 
 
-# save file
+# save file with avg_pool output
 filename = "img_features.json"
 with open(filename, "w") as f:
     for i in range(len(features)):
@@ -121,13 +121,14 @@ print('File save completed')
 
 
 
-# retrain model
+
+
+#### RETRAINING LAST LAYER ##### 
 
 # map string labels to unique integers
 u,indices = np.unique(np.array(listlabels), return_inverse=True)
 print('Categories: ', u)
 num_categories = len(u)
-batch_size = len(features)
 
 # get avg pool dimensions
 batch_size, num_units_in = features_tensor.get_shape().as_list()
@@ -161,13 +162,16 @@ sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
 print("Completed training")
 
 
-
 # saving new model
-#tf.train.export_meta_graph(filename='tmp_model.meta')
-#saver = tf.train.Saver()
-#save_path = saver.save(sess, "tmp_model.ckpt")
+tf.train.export_meta_graph(filename='new_model.meta')
+saver = tf.train.Saver()
+save_path = saver.save(sess, "new_model.ckpt")
 
-# test the model
+
+
+
+
+#### TEST ####
 # read images
 listimgs, listlabels = read_images(base_dir+"Tres gros plan")
 img = load_image(listimgs[0])
