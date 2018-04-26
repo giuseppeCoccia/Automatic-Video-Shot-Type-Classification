@@ -3,6 +3,7 @@ import json
 import os
 import numpy as np
 import cv2
+import sys
 
 
 FC_WEIGHT_STDDEV = 0.01
@@ -45,14 +46,17 @@ def loss(logits, labels):
 # given path to dir, return all the images (and labels) from images of that dir
 # if there are subdirs, it goes into them (each subdir is a different label)
 def read_images(dir):
-     listimgs = list()
-     listlabels = list()
-     for path, subdirs, files in os.walk(dir):
-          for name in files:
-               if ".jpg" in name:
-                    listimgs.append(os.path.join(path, name))
-                    listlabels.append(path.split('/')[-1])
-     return listimgs, listlabels
+	listimgs = list()
+	listlabels = list()
+	for path, subdirs, files in os.walk(dir):
+		for name in files:
+			if ".jpg" in name:
+				listimgs.append(os.path.join(path, name))
+				if path[-1] == '/':
+					listlabels.append(path.split('/')[-2])
+				else:
+					listlabels.append(path.split('/')[-1])
+	return listimgs, listlabels
 
 
 
@@ -62,18 +66,13 @@ def read_images(dir):
 
 ##### LOAD IMAGES ######
 # read images
-base_dir = "../Data/Images_Plans/"
-#listimgs, listlabels = read_images(base_dir)
-listimgs, listlabels = read_images(base_dir+"Gros plan")
-a, b = read_images(base_dir+"Plan moyen")
-listimgs += a
-listlabels += b
-a, b = read_images(base_dir+"Plan rapproche")
-listimgs += a
-listlabels += b
+listimgs, listlabels = [], []
+for path in sys.argv:
+	imgs, labels = read_images(path)
+	listimgs += imgs
+	listlabels += labels
 print('Completed loading images names')
-
-
+print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
 
 # load images
@@ -83,7 +82,6 @@ for image in listimgs:
 	batch = img.reshape((224, 224, 3))
 	loaded_imgs.append(batch)
 print('Completed loading images')
-print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
 
 
@@ -99,6 +97,7 @@ sess = tf.Session()
 # restore model
 new_saver = tf.train.import_meta_graph(meta_fn(layers))
 new_saver.restore(sess, checkpoint_fn(layers))
+print("Completed restoring pretrained model")
 # load last-but-one (layer) tensor after feeding images
 graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
@@ -173,7 +172,8 @@ save_path = saver.save(sess, "new_model.ckpt")
 
 #### TEST ####
 # read images
-listimgs, listlabels = read_images(base_dir+"Tres gros plan")
+base_dir = '../Data/Images_Plans/'
+listimgs, listlabels = read_images(base_dir+"cropped_Tres gros plan")
 img = load_image(listimgs[0])
 batch = img.reshape((1, 224, 224, 3))
 
