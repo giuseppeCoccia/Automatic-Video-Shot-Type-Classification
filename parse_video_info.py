@@ -15,7 +15,7 @@ video_ = sys.argv[1]+"_faces.MP4"
 
 mode = sys.argv[2]
 
-
+#### UTILS FUNCTIONS
 # base and high of the two images
 def get_ratio(b1, h1, b2, h2):
 	a1 = b1*h1
@@ -25,12 +25,34 @@ def get_ratio(b1, h1, b2, h2):
 		return a2/a1
 	return a1/a2
 
-def on_head(y1_down, h, n_split=3):
-	lower_limit_h = h-h/n_split
-	return (y1_down > lower_limit_h)
+# coordinates is an array of 4 points: (x_top, y_top, x_bottom, y_bottom)
+def on_head(coordinates, h, n_split=3):
+	lower_limit_h = h/n_split
+	y1_down = coordinates[3]
+	return (y1_down <= lower_limit_h)
+
+# coordinates is an array of 4 points: (x_top, y_top, x_bottom, y_bottom)
+# b and h are the dimensions of th original frame
+# n_split is the number of "split" on which the frame will be divided into
+# large_split is to decide if we want only the center split, or to esclude only the first and last
+def on_center(coordinates, b, h, n_split=3, large_split=True):
+	if large_split:
+		upper_limit_h = h/n_split
+		lower_limit_h = h*(n_split-1)/n_split
+	else:
+		if(n_split % 2 == 0):
+			mid = n_split / 2
+			upper_limit_h = h*(mid-1)/n_split
+			lower_limit_h = h*(mid+1)/n_split
+		else:
+			mid = n_split // 2
+			upper_limit_h = h*mid/n_split
+			lower_limit_h = h*(mid+1)/n_split
+	return (coordinates[1] >= upper_limit_h and coordinates[3] <= lower_limit_h)
 
 
-# main
+
+#### MAIN ###
 
 # read video dimensions first
 cmd_ = "./get_video_resolution.sh "+video_
@@ -68,7 +90,14 @@ elif(mode == '-plan_moyen'):
 	for key, value in frames.items():
 		if(len(value) == 1):
 			coordinates = value[0]	
-			if on_head(coordinates[3], int(dim[1]), n_split=4):
+			if on_head(coordinates, int(dim[1]), n_split=5):
 				frms.append(key)
-
+elif(mode == '-plan_rapproche'):
+	for key, value in frames.items():
+		if(len(value) == 1):
+			coordinates = value[0]	
+			if on_center(coordinates, int(dim[0]), int(dim[1]), n_split=3):
+				frms.append(key)
+else:
+	frms = list(frames.keys())
 print(" ".join(str(x) for x in frms))

@@ -4,7 +4,7 @@ input_=$1
 output_=$2
 
 read frames_in
-
+echo $frames_in
 # if input is empty exit
 if [ -z $frames_in ]; then
 	echo "No entry"
