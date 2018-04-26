@@ -4,12 +4,11 @@ input_=$1
 output_=$2
 
 read frames_in
-echo $frames_in
 
 # if input is empty exit
 if [ -z $frames_in ]; then
-echo "No entry"
-exit 1
+	echo "No entry"
+	exit 1
 fi
 
 frames=''
@@ -17,7 +16,6 @@ frames=''
 #for i in "${@:2}"
 for i in $frames_in
 do
-	echo $i
 	frames+="eq(n\,$i)+"
 done
 
@@ -25,5 +23,4 @@ done
 frames=${frames::-1}
 
 basename_=$(basename $input_)
-echo ${$basename_%.*}
 ffmpeg -i "$input_" -vf select=$frames -vsync 0 "$output_/${basename_%.*}_%d.jpg"
