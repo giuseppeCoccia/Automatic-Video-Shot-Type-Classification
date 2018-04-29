@@ -7,4 +7,4 @@ fi
 video_name=$1
 path_dir=$2
 mode=$3
-python3 parse_video_info.py $video_name $mode | ./extract_frames.sh "${video_name}_faces.MP4" $path_dir
+python3 parse_video_info.py $video_name $mode | ./extract_frames.sh "${video_name}.mp4" $path_dir

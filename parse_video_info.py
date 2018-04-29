@@ -11,7 +11,7 @@ if(len(sys.argv) < 3):
 	exit()
 
 file_ = sys.argv[1]+"_faces.txt"
-video_ = sys.argv[1]+"_faces.MP4"
+video_ = sys.argv[1]+".mp4"
 
 mode = sys.argv[2]
 
@@ -26,16 +26,17 @@ def get_ratio(b1, h1, b2, h2):
 	return a1/a2
 
 # coordinates is an array of 4 points: (x_top, y_top, x_bottom, y_bottom)
-def on_head(coordinates, h, n_split=3):
+def on_head(coordinates, h, n_split=3, h_ratio_limit=0.7):
 	lower_limit_h = h/n_split
 	y1_down = coordinates[3]
-	return (y1_down <= lower_limit_h)
+	h_ratio = (coordinates[3]-coordinates[1])/(lower_limit_h)
+	return (y1_down <= lower_limit_h and h_ratio >= h_ratio_limit)
 
 # coordinates is an array of 4 points: (x_top, y_top, x_bottom, y_bottom)
 # b and h are the dimensions of th original frame
 # n_split is the number of "split" on which the frame will be divided into
 # large_split is to decide if we want only the center split, or to esclude only the first and last
-def on_center(coordinates, b, h, n_split=3, large_split=True):
+def on_center(coordinates, b, h, n_split=3, large_split=True, h_ratio_limit=0.4):
 	if large_split:
 		upper_limit_h = h/n_split
 		lower_limit_h = h*(n_split-1)/n_split
@@ -48,7 +49,8 @@ def on_center(coordinates, b, h, n_split=3, large_split=True):
 			mid = n_split // 2
 			upper_limit_h = h*mid/n_split
 			lower_limit_h = h*(mid+1)/n_split
-	return (coordinates[1] >= upper_limit_h and coordinates[3] <= lower_limit_h)
+	h_ratio = (coordinates[3]-coordinates[1])/(lower_limit_h-upper_limit_h)
+	return (coordinates[1] >= upper_limit_h and coordinates[3] <= lower_limit_h and h_ratio >= h_ratio_limit)
 
 
 
@@ -90,13 +92,13 @@ elif(mode == '-plan_moyen'):
 	for key, value in frames.items():
 		if(len(value) == 1):
 			coordinates = value[0]	
-			if on_head(coordinates, int(dim[1]), n_split=5):
+			if on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0):
 				frms.append(key)
 elif(mode == '-plan_rapproche'):
 	for key, value in frames.items():
 		if(len(value) == 1):
 			coordinates = value[0]	
-			if on_center(coordinates, int(dim[0]), int(dim[1]), n_split=3):
+			if on_center(coordinates, int(dim[0]), int(dim[1]), n_split=3) or on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0.7):
 				frms.append(key)
 else:
 	frms = list(frames.keys())
