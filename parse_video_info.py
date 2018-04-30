@@ -69,9 +69,13 @@ with open(file_, "r") as f:
 		words = line.split()
 		frame = words[0]
 		x_top = int(words[1])
+		if(x_top < 0): x_top = 0
 		y_top = int(words[2])
+		if(y_top < 0): y_top = 0
 		x_down = int(words[3])
+		if(x_down > int(dim[0])): x_down = int(dim[0])
 		y_down = int(words[4])
+		if(y_down > int(dim[1])): y_down = int(dim[1])
 		
 		if frame not in frames.keys():
 			frames[frame] = [(x_top, y_top, x_down, y_down)]
@@ -85,20 +89,24 @@ if(mode == '-gros_plan'):
 		if(len(value) == 1):
 			coordinates = value[0]
 			ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-			if ratio > 0.25:
+			if ratio > 0.25: #and ratio < 0.35
 				frms.append(key)
 # PLAN MOYEN
 elif(mode == '-plan_moyen'):
 	for key, value in frames.items():
 		if(len(value) == 1):
 			coordinates = value[0]	
-			if on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0):
+			ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
+			if ratio > 0.005 and ratio < 0.007 and coordinates[3] < 384-220:
+			#if on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0):
 				frms.append(key)
 elif(mode == '-plan_rapproche'):
 	for key, value in frames.items():
 		if(len(value) == 1):
 			coordinates = value[0]	
-			if on_center(coordinates, int(dim[0]), int(dim[1]), n_split=3) or on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0.7):
+			ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
+			if ratio > 0.01 and ratio < 0.08 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
+			#if on_center(coordinates, int(dim[0]), int(dim[1]), n_split=3) or on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0.7):
 				frms.append(key)
 else:
 	frms = list(frames.keys())
