@@ -12,7 +12,6 @@ if(len(sys.argv) < 3):
 
 file_ = sys.argv[1]+"_faces.txt"
 video_ = sys.argv[1]+".mp4"
-
 mode = sys.argv[2]
 
 #### UTILS FUNCTIONS
@@ -67,7 +66,7 @@ frames = {}
 with open(file_, "r") as f:
 	for line in f:
 		words = line.split()
-		frame = words[0]
+		frame = int(words[0])
 		x_top = int(words[1])
 		if(x_top < 0): x_top = 0
 		y_top = int(words[2])
@@ -82,32 +81,19 @@ with open(file_, "r") as f:
 		else:
 			frames[frame].append((x_top, y_top, x_down, y_down))
 
-# GROS PLAN
-frms = []
-if(mode == '-gros_plan'):
-	for key, value in frames.items():
-		if(len(value) == 1):
-			coordinates = value[0]
-			ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-			if ratio > 0.25: #and ratio < 0.35
-				frms.append(key)
-# PLAN MOYEN
-elif(mode == '-plan_moyen'):
-	for key, value in frames.items():
-		if(len(value) == 1):
-			coordinates = value[0]	
-			ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-			if ratio > 0.005 and ratio < 0.007 and coordinates[3] < 384-220:
-			#if on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0):
-				frms.append(key)
-elif(mode == '-plan_rapproche'):
-	for key, value in frames.items():
-		if(len(value) == 1):
-			coordinates = value[0]	
-			ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-			if ratio > 0.01 and ratio < 0.08 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
-			#if on_center(coordinates, int(dim[0]), int(dim[1]), n_split=3) or on_head(coordinates, int(dim[1]), n_split=3, h_ratio_limit=0.7):
-				frms.append(key)
-else:
-	frms = list(frames.keys())
-print(" ".join(str(x) for x in frms))
+old_key = -1
+frms = {'plan_moyen':[], 'plan_rapproche':[], 'gros_plan':[]}
+for key, value in sorted(frames.items()):
+	if(old_key == -1): old_key = key
+	elif(key < old_key+20): continue
+	old_key = key
+	if(len(value) == 1):
+		coordinates = value[0]
+		ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
+		if ratio > 0.25: #and ratio < 0.35
+			frms['gros_plan'].append(key)
+		elif ratio > 0.005 and ratio < 0.007 and coordinates[3] < 384-220:
+			frms['plan_moyen'].append(key)
+		elif ratio > 0.01 and ratio < 0.08 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
+			frms['plan_rapproche'].append(key)
+print(" ".join(str(x) for x in frms[mode]))
