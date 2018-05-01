@@ -135,7 +135,7 @@ batch_size, num_units_in = features_tensor.get_shape().as_list()
 # define placeholder that will contain the inputs of the new layer
 bottleneck_input = tf.placeholder(tf.float32, shape=[batch_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
 # define placeholder for the categories
-labelsVar = tf.placeholder(tf.int32, shape=(batch_size), name='labelsVar')
+labelsVar = tf.placeholder(tf.int32, shape=[batch_size], name='labelsVar')
 
 
 # weights and biases
@@ -145,7 +145,6 @@ biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_
 
 logits = tf.matmul(bottleneck_input, weights)
 logits = tf.nn.bias_add(logits, biases)
-
 final_tensor = tf.nn.softmax(logits, name="final_result")
 
 loss_ = loss(logits, labelsVar)
@@ -153,7 +152,7 @@ ops = tf.train.AdamOptimizer(learning_rate=0.01)
 train_op = ops.minimize(loss_)
 
 # run training session
-sess = tf.Session()
+#sess = tf.Session()
 init=tf.global_variables_initializer()
 sess.run(init)
 
@@ -173,10 +172,11 @@ save_path = saver.save(sess, "new_model.ckpt")
 #### TEST ####
 # read images
 base_dir = '../Data/Images_Plans/'
-listimgs, listlabels = read_images(base_dir+"cropped_Tres gros plan")
+listimgs, listlabels = read_images(base_dir+"Plan americain")
+print(listimgs[0])
 img = load_image(listimgs[0])
 batch = img.reshape((1, 224, 224, 3))
 
 features = sess.run(features_tensor, feed_dict = {images: batch})
 prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-print(prob[0], "->", u[np.argwhere(prob[0])])
+print(prob, "->", u[np.argwhere(prob[0])])

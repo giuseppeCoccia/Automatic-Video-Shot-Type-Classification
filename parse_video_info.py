@@ -90,10 +90,13 @@ for key, value in sorted(frames.items()):
 	if(len(value) == 1):
 		coordinates = value[0]
 		ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
+		# GROS PLAN
 		if ratio > 0.25: #and ratio < 0.35
 			frms['gros_plan'].append(key)
-		elif ratio > 0.005 and ratio < 0.007 and coordinates[3] < 384-220:
+		# PLAN MOYEN
+		elif ratio > 0.006 and ratio < 0.01 and coordinates[3] < 384-220:
 			frms['plan_moyen'].append(key)
-		elif ratio > 0.01 and ratio < 0.08 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
+		# PLAN RAPPROCHE
+		elif ratio > 0.03 and ratio < 0.08 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
 			frms['plan_rapproche'].append(key)
 print(" ".join(str(x) for x in frms[mode]))
