@@ -68,13 +68,13 @@ with open(file_, "r") as f:
 		words = line.split()
 		frame = int(words[0])
 		x_top = int(words[1])
-		if(x_top < 0): x_top = 0
+		#if(x_top < 0): x_top = 0
 		y_top = int(words[2])
-		if(y_top < 0): y_top = 0
+		#if(y_top < 0): y_top = 0
 		x_down = int(words[3])
-		if(x_down > int(dim[0])): x_down = int(dim[0])
+		#if(x_down > int(dim[0])): x_down = int(dim[0])
 		y_down = int(words[4])
-		if(y_down > int(dim[1])): y_down = int(dim[1])
+		#if(y_down > int(dim[1])): y_down = int(dim[1])
 		
 		if frame not in frames.keys():
 			frames[frame] = [(x_top, y_top, x_down, y_down)]
@@ -82,21 +82,28 @@ with open(file_, "r") as f:
 			frames[frame].append((x_top, y_top, x_down, y_down))
 
 old_key = -1
-frms = {'plan_moyen':[], 'plan_rapproche':[], 'gros_plan':[]}
+frms = {'plan_moyen':[], 'plan_rapproche':[], 'plan_americain':[], 'gros_plan':[], 'plan_large':[]}
 for key, value in sorted(frames.items()):
 	if(old_key == -1): old_key = key
 	elif(key < old_key+20): continue
-	old_key = key
 	if(len(value) == 1):
 		coordinates = value[0]
 		ratio = get_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
 		# GROS PLAN
 		if ratio > 0.25: #and ratio < 0.35
 			frms['gros_plan'].append(key)
-		# PLAN MOYEN
-		elif ratio > 0.006 and ratio < 0.01 and coordinates[3] < 384-220:
+		# PLAN MOYEN (0.006 0.01)
+		elif ratio > 0.006 and ratio < 0.007 and coordinates[3] < 384-220:
 			frms['plan_moyen'].append(key)
-		# PLAN RAPPROCHE
-		elif ratio > 0.03 and ratio < 0.08 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
+		# PLAN RAPPROCHE (0.03 and 0.08)
+		elif ratio > 0.05 and ratio < 0.06 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
 			frms['plan_rapproche'].append(key)
+		# PLAN AMERICAIN (0.01 and 0.03)
+		elif ratio > 0.012 and ratio < 0.018:
+			frms['plan_americain'].append(key)
+		# PLAN LARGE (0 and 0.006)
+		elif ratio < 0.006 and ratio > 0:
+			frms['plan_large'].append(key)
+		else: continue #if not chosen, do not update key
+	old_key = key
 print(" ".join(str(x) for x in frms[mode]))
