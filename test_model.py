@@ -41,5 +41,5 @@ features = sess.run(features_tensor, feed_dict = {images: loaded_imgs})
 
 bottleneck_input = graph.get_tensor_by_name("BottleneckInputPlaceholder:0")
 final_tensor = graph.get_tensor_by_name("final_result:0")
-prob = sess.run(final_tensor, feed_dict = {images: batch, bottleneck_input: features})
-print(prob[0])
+prob = sess.run(final_tensor, feed_dict = {images: loaded_imgs[0], bottleneck_input: features})
+print(listimgs[0], "->", prob[0])
