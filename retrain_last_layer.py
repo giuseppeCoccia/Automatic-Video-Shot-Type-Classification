@@ -3,8 +3,10 @@ import json
 import os
 import numpy as np
 import cv2
-import sys
 from utils import *
+import argparse
+from sklearn.utils import shuffle
+
 
 FC_WEIGHT_STDDEV = 0.01
 
@@ -20,27 +22,47 @@ def meta_fn(layers):
 
 # cross entropy loss, as it is a classification problem it is better
 def loss(logits, labels):
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits_v2(labels=labels, logits=logits)
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
     
-    regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-    loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
-    #loss_ = tf.add_n([cross_entropy_mean])
-    tf.summary.scalar('loss', loss_)
+    #regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    #loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
+    loss_ = cross_entropy_mean
+    #tf.summary.scalar('loss', loss_)
     
     return loss_
 
+def save_features(features, filename="img_features.json"):
+    # save file with avg_pool output
+    with open(filename, "w") as f:
+        for i in range(len(features)):
+            feats_i = features[i].tolist()
+            res = [listimgs[i], feats_i]
+            f.write(json.dumps(res) + "\n") # Print features in file "img_features.json"
+    print('File save completed')
+
+
 
 ### START EXECUTION
+parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
+parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50, 152], help='chose pretrained model')
+parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
+parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
+parser.add_argument('-test', '--test-directory', nargs='+', help='path to test directory')
+
+args = parser.parse_args()
+train_paths = args.train
+validation_paths = args.validation
+test_path = args.test
+
 
 ##### LOAD IMAGES ######
 # read images
 listimgs, listlabels = [], []
-for path in sys.argv:
+for path in train_paths:
 	imgs, labels = read_images(path)
-	# RICORDATI DI TOGLIERE :42 !!!!!!
-	listimgs += imgs[:42]
-	listlabels += labels[:42]
+	listimgs += img
+	listlabels += labels
 print('Completed loading images names')
 print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
@@ -59,7 +81,7 @@ print('Completed loading images')
 
 ##### MODEL #####
 # load from existing model and retrain last layer
-layers = 50 # model to be loaded
+layers = args.arch # model to be loaded
 
 
 sess = tf.Session()
@@ -68,31 +90,23 @@ sess = tf.Session()
 new_saver = tf.train.import_meta_graph(meta_fn(layers))
 new_saver.restore(sess, checkpoint_fn(layers))
 print("Completed restoring pretrained model")
+
 # load last-but-one (layer) tensor after feeding images
 graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
 images = graph.get_tensor_by_name("images:0")
-feed_dict = {images: loaded_imgs}
-features = sess.run(features_tensor, feed_dict=feed_dict) # Run the ResNet on loaded images
-print('Completed running ResNet') # features now containes avg_pool output
 
-print('Read', len(features), 'features')
+#print('Completed running ResNet') # features now containes avg_pool output
 
 
 # save file with avg_pool output
-filename = "img_features.json"
-with open(filename, "w") as f:
-    for i in range(len(features)):
-        feats_i = features[i].tolist()
-        res = [listimgs[i], feats_i]
-        f.write(json.dumps(res) + "\n") # Print features in file "img_features.json"
-print('File save completed')
+#save_features(features)
 
 
 
+#### RETRAINING LAST LAYER #####
 
-
-#### RETRAINING LAST LAYER ##### 
+## placeholders and variables
 
 # map string labels to unique integers
 u,indices = np.unique(np.array(listlabels), return_inverse=True)
@@ -113,6 +127,7 @@ weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
 weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
 biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
 
+# operations
 logits = tf.matmul(bottleneck_input, weights)
 logits = tf.nn.bias_add(logits, biases)
 final_tensor = tf.nn.softmax(logits, name="final_result")
@@ -125,8 +140,12 @@ train_op = ops.minimize(loss_)
 init=tf.global_variables_initializer()
 sess.run(init)
 
-features = [np.tanh(array) for array in features]
-sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
+for epoch in range(epochs):
+    X_train, y_train = shuffle(loaded_imgs, indices)
+    
+    features = sess.run(features_tensor, feed_dict={images: X_train}) # Run the ResNet on loaded images
+    features = [np.tanh(array) for array in features]
+    sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: y_train})
 print("Completed training")
 
 
