@@ -15,10 +15,19 @@ def load_image(path, size=224):
 
 # given path to dir, return all the images (and labels) from images of that dir
 # if there are subdirs, it goes into them (each subdir is a different label)
-def read_images(dir):
+def read_images(path_):
         listimgs = list()
         listlabels = list()
-        for path, subdirs, files in os.walk(dir):
+	if(os.path.isfile(path_)):
+		listimgs.append(path_)
+		dirpath = os.path.dirname(path_)	
+		if path[-1] == '/':
+			listlabels.append(path.split('/')[-2])
+		else:
+			listlabels.append(path.split('/')[-1])
+		return listimgs, listlabels
+
+        for path, subdirs, files in os.walk(path_):
                 for name in files:
                         if ".jpg" in name:
                                 listimgs.append(os.path.join(path, name))

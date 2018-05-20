@@ -9,7 +9,6 @@ from utils import *
 FC_WEIGHT_STDDEV = 0.01
 
 
-
 ##### UTILS #####
 # used to load the pretrained model
 def checkpoint_fn(layers):
@@ -25,8 +24,8 @@ def loss(logits, labels):
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
     
     regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-    
     loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
+    #loss_ = tf.add_n([cross_entropy_mean])
     tf.summary.scalar('loss', loss_)
     
     return loss_
@@ -39,8 +38,9 @@ def loss(logits, labels):
 listimgs, listlabels = [], []
 for path in sys.argv:
 	imgs, labels = read_images(path)
-	listimgs += imgs
-	listlabels += labels
+	# RICORDATI DI TOGLIERE :42 !!!!!!
+	listimgs += imgs[:42]
+	listlabels += labels[:42]
 print('Completed loading images names')
 print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
 
@@ -59,7 +59,7 @@ print('Completed loading images')
 
 ##### MODEL #####
 # load from existing model and retrain last layer
-layers = 152 # model to be loaded
+layers = 50 # model to be loaded
 
 
 sess = tf.Session()
@@ -118,14 +118,14 @@ logits = tf.nn.bias_add(logits, biases)
 final_tensor = tf.nn.softmax(logits, name="final_result")
 
 loss_ = loss(logits, labelsVar)
-ops = tf.train.AdamOptimizer(learning_rate=0.01)
+ops = tf.train.AdamOptimizer(learning_rate=0.001)
 train_op = ops.minimize(loss_)
 
 # run training session
-#sess = tf.Session()
 init=tf.global_variables_initializer()
 sess.run(init)
 
+features = [np.tanh(array) for array in features]
 sess.run(train_op, feed_dict={bottleneck_input: features, labelsVar: indices})
 print("Completed training")
 
@@ -139,14 +139,45 @@ save_path = saver.save(sess, "new_model.ckpt")
 
 
 
-#### TEST ####
-# read images
-base_dir = '../Data/Images_Plans/'
-listimgs, listlabels = read_images(base_dir+"Plan americain")
-print(listimgs[0])
-img = load_image(listimgs[0])
-batch = img.reshape((1, 224, 224, 3))
 
-features = sess.run(features_tensor, feed_dict = {images: batch})
+
+
+
+
+
+
+#### TEST ####
+def accuracy(true_labels, predicted_labels):
+	correct = 0
+	for i in range(len(true_labels)):
+		if true_labels[i] == predicted_labels[i]:
+			correct += 1
+	return (correct/len(true_labels))*100
+
+# read images
+base_dir = '../Data/Videos/'
+
+listimgs, listlabels = read_images(base_dir+"extracted_frames_plan_americain")
+listimgs = listimgs[:30]
+print("LEN LISTIMGS TEST:", len(listimgs))
+
+# load images
+loaded_imgs = []
+for image in listimgs:
+        img = load_image(image)
+        batch = img.reshape((224, 224, 3))
+        loaded_imgs.append(batch)
+
+
+#img = load_image(listimgs)
+#batch = img.reshape((1, 224, 224, 3))
+
+features = sess.run(features_tensor, feed_dict = {images: loaded_imgs})
+features = [np.tanh(array) for array in features]
+print("FEATURES:", features)
 prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-print(prob, "->", u[np.argwhere(prob[0])])
+print("First element probability:", prob[0], "->", u[np.argmax(prob[0])])
+print("PROB:", prob)
+
+print([u[np.argmax(probability)] for probability in prob])
+print("Accuracy:", accuracy(["extracted_frames_gros_plan" for x in range(len(loaded_imgs))], [u[np.argmax(probability)] for probability in prob]), "%")
