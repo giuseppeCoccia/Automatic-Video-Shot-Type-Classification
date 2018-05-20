@@ -8,7 +8,7 @@ import argparse
 from sklearn.utils import shuffle
 
 epochs = 20
-learning_rate = 0.0001
+learning_rate = 0.001
 FC_WEIGHT_STDDEV = 0.01
 
 
@@ -137,12 +137,14 @@ for epoch in range(epochs):
 	#save_features(features)
 	# apply tanh transformation
 	features = [np.tanh(array) for array in features]
+	#features = [np.log1p(array) for array in features]
 	# run session
 	_, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: y_train})
 
 	# print accuracy
 	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
 	features = [np.tanh(array) for array in features]
+	#features = [np.log1p(array) for array in features]
 	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
 	acc = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
 	print(epoch+1, ": Loss", loss, "- Training Accuracy", acc)
@@ -181,6 +183,7 @@ if test_paths is not None:
 	# test
 	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_t})
 	features = [np.tanh(array) for array in features]
+	#features = [np.log1p(array) for array in features]
 	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
 	print("PROB:", prob)
 	print([u[np.argmax(probability)] for probability in prob])

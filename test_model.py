@@ -36,7 +36,8 @@ graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
 images = graph.get_tensor_by_name("images:0")
 features = sess.run(features_tensor, feed_dict = {images: loaded_imgs})
-features = [np.tanh(array) for array in features] # apply tanh to squeeze features
+#features = [np.tanh(array) for array in features] # apply tanh to squeeze features
+features = [np.log1p(array) for array in features] # apply tanh to squeeze features
 
 bottleneck_input = graph.get_tensor_by_name("BottleneckInputPlaceholder:0")
 final_tensor = graph.get_tensor_by_name("final_result:0")

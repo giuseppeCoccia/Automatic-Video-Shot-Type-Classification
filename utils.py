@@ -21,11 +21,12 @@ def save_features(features, filename="img_features.json"):
 # [height, width, depth]
 def load_image(path, size=224):
     img = cv2.imread(path)
-    short_edge = min(img.shape[:2])
-    yy = int((img.shape[0] - short_edge) / 2)
-    xx = int((img.shape[1] - short_edge) / 2)
-    crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
-    resized_img = cv2.resize(crop_img, (size, size))
+    #short_edge = min(img.shape[:2])
+    #yy = int((img.shape[0] - short_edge) / 2)
+    #xx = int((img.shape[1] - short_edge) / 2)
+    #crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
+    #resized_img = cv2.resize(crop_img, (size, size))
+    resized_img = cv2.resize(img, (size, size))
     return resized_img
 
 

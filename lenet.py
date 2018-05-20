@@ -98,7 +98,7 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
 				  "  =====> Training Accuracy={:.3f}", evaluate(X_validation, y_validation))
 
 print("Optimization Finished!")
-summary_writer.flush()
+#summary_writer.flush()
 
 
 ### START EXECUTION
