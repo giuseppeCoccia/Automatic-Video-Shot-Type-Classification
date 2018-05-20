@@ -1,6 +1,22 @@
 import cv2
 import os
 
+def checkpoint_fn(layers):
+    return 'ResNet-L%d.ckpt' % layers
+
+# used to load the pretrained model
+def meta_fn(layers):
+    return 'ResNet-L%d.meta' % layers
+
+def save_features(features, filename="img_features.json"):
+    # save file with avg_pool output
+    with open(filename, "w") as f:
+        for i in range(len(features)):
+            feats_i = features[i].tolist()
+            res = [listimgs[i], feats_i]
+            f.write(json.dumps(res) + "\n") # Print features in file "img_features.json"
+    print('File save completed')
+
 # image of shape [224, 224, 3]
 # [height, width, depth]
 def load_image(path, size=224):
@@ -16,23 +32,30 @@ def load_image(path, size=224):
 # given path to dir, return all the images (and labels) from images of that dir
 # if there are subdirs, it goes into them (each subdir is a different label)
 def read_images(path_):
-        listimgs = list()
-        listlabels = list()
+	listimgs = list()
+	listlabels = list()
 	if(os.path.isfile(path_)):
 		listimgs.append(path_)
 		dirpath = os.path.dirname(path_)	
-		if path[-1] == '/':
-			listlabels.append(path.split('/')[-2])
+		if path_[-1] == '/':
+			listlabels.append(path_.split('/')[-2])
 		else:
-			listlabels.append(path.split('/')[-1])
+			listlabels.append(path_.split('/')[-1])
 		return listimgs, listlabels
 
-        for path, subdirs, files in os.walk(path_):
-                for name in files:
-                        if ".jpg" in name:
-                                listimgs.append(os.path.join(path, name))
-                                if path[-1] == '/':
-                                        listlabels.append(path.split('/')[-2])
-                                else:
-                                        listlabels.append(path.split('/')[-1])
-        return listimgs, listlabels
+	for path, subdirs, files in os.walk(path_):
+		for name in files:
+			if ".jpg" in name:
+				listimgs.append(os.path.join(path, name))
+				if path[-1] == '/':
+					listlabels.append(path.split('/')[-2])
+				else:
+					listlabels.append(path.split('/')[-1])
+	return listimgs, listlabels
+
+
+def accuracy(true_labels, predicted_labels):
+        correct = 0
+        for t, p in zip(true_labels, predicted_labels):
+                if t == p: correct += 1
+        return (correct/len(true_labels))

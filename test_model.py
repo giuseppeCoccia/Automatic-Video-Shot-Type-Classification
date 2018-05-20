@@ -2,29 +2,26 @@ import tensorflow as tf
 import numpy as np
 import sys
 from utils import *
-
+import argparse
 
 ### START EXECUTION
+parser = argparse.ArgumentParser(description="Script for testing the retrained architecture")
+parser.add_argument('test', nargs='+', help='path to test directory')
+parser.add_argument('-c', '--categories', nargs='+', default=['Gros plan', 'Plan moyen', 'Plan rapproche'], help='categories on which has been trained the model, in the order of the probabilities array')
+
+args = parser.parse_args()
+test_paths = args.test
+categories = args.categories
 
 ##### LOAD IMAGES ######
 # read images
 listimgs, listlabels = [], []
-for path in sys.argv:
+for path in test_paths:
         imgs, labels = read_images(path)
        	listimgs += imgs
         listlabels += labels
-print('Completed loading images names')
+loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
 print('Loaded', len(listimgs), 'images and', len(listlabels), 'labels')
-
-# load images
-loaded_imgs = []
-for image in listimgs:
-        img = load_image(image)
-        batch = img.reshape((224, 224, 3))
-        loaded_imgs.append(batch)
-print('Completed loading images')
-
-
 
 ##### MODEL #####
 sess = tf.Session()
@@ -46,7 +43,6 @@ final_tensor = graph.get_tensor_by_name("final_result:0")
 
 # get probabilities
 prob = sess.run(final_tensor, feed_dict = {images: loaded_imgs, bottleneck_input: features})
-print(listimgs[0], "->", prob[0])
 print(prob)
-
-print([u[np.argmax(probability)] for probability in prob])
+print([categories[np.argmax(probability)] for probability in prob])
+print("Accuracy:", accuracy(listlabels, [categories[np.argmax(probability)] for probability in prob]))
