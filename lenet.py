@@ -83,7 +83,7 @@ def evaluate(logits, labels, batch_size=32):
         
     return total_accuracy / num_examples
 
-def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
+def train(init, sess, n_epochs, batch_size, optimizer, cost):
 	# optimizer and cost are the same kinds of objects as in Section 1
 	# Train your model
 	global X_train, y_train, X_validation, y_validation
@@ -100,7 +100,7 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
 			batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
 			# Run optimization op (backprop), cost op (to get loss value)
 			# and summary nodes
-			_, c, summary = sess.run([optimizer, cost, merged_summary_op],
+			_, c  = sess.run([optimizer, cost],
 									 feed_dict={x: batch_xs, y: batch_ys})
 									 # Write logs at every iteration
 									 #summary_writer.add_summary(summary, epoch * total_batch + i)
@@ -214,7 +214,7 @@ init = tf.global_variables_initializer()
 
 with tf.Session() as sess:
 	t0 = time.time()
-	train(init, sess, training_epochs, batch_size, optimizer, cost, merged_summary_op)
+	train(init, sess, training_epochs, batch_size, optimizer, cost)
 	t1 = time.time()
 
 	print("Training time:", t1-t0)
