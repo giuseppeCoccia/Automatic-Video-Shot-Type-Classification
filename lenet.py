@@ -1,8 +1,6 @@
 import tensorflow as tf
 import time
-import os
 import numpy as np
-import cv2
 from utils import *
 import argparse
 from sklearn.utils import shuffle
@@ -63,11 +61,12 @@ def LeNet5(image):
 	return fc3_output
 
 # encoding
-def encode(labels):
-	u, indices = np.unique(np.array(labels), return_inverse=True)
-	onehot_y = np.zeros((indices.size, indices.max()+1))
-	onehot_y[np.arange(indices.size), indices] = 1
-	return u, onehot_y
+def encode(labels, indices=None, u=None):
+    if(indices is None):
+        u, indices = np.unique(np.array(labels), return_inverse=True)
+    onehot_y = np.zeros((len(labels), len(u)))
+    onehot_y[np.arange(len(labels)), indices] = 1
+    return u, onehot_y
 
 def evaluate(logits, labels, batch_size=32):
     # logits will be the outputs of your model, labels will be one-hot vectors corresponding to the actual labels
@@ -114,7 +113,7 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
 				  "  =====> Validation Accuracy=", evaluate(X_validation, y_validation))
 
 print("Optimization Finished!")
-#summary_writer.flush()
+
 
 
 ### START EXECUTION
@@ -127,6 +126,7 @@ args = parser.parse_args()
 train_paths = args.train
 validation_paths = args.validation
 test_paths = args.test
+
 
 
 ##### LOAD IMAGES ######
@@ -142,10 +142,9 @@ for path in train_paths:
 # load images
 loaded_imgs = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images', loaded_imgs[0].shape, 'and', len(listlabels), 'labels')
-u, onehot_y = encode(listlabels)
-print('Categories: ', u)
+u, y_train = encode(listlabels)
 X_train = loaded_imgs
-y_train = onehot_y
+print('Categories: ', u)
 
 
 ### validation images
@@ -157,8 +156,7 @@ for path in validation_paths:
 loaded_imgs_v = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 X_validation = loaded_imgs_v
-y_validation = np.zeros((len(listlabels_v), len(u)))
-y_validation[np.arange(len(listlabels_v)), [np.argwhere(u == label) for label in listlabels_v]] = 1
+_, y_validation = encode(listlabels_v, [np.argwhere(u == label) for label in listlabels_v], u)
 
 
 ### test images
@@ -170,8 +168,8 @@ for path in test_paths:
 loaded_imgs_t = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_t]
 print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 X_test = loaded_imgs_t
-y_test = np.zeros((len(listlabels_t), len(u)))
-y_test[np.arange(len(listlabels_t)), [np.argwhere(u == label) for label in listlabels_t]] = 1
+_, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabels_t], u)
+
 
 
 ##### MODEL #####
@@ -213,12 +211,6 @@ saver = tf.train.Saver()
 
 # Initializing the variables
 init = tf.global_variables_initializer()
-# Create a summary to monitor cost tensor
-tf.summary.scalar("Loss_LeNet-5_Adam", cost)
-# Create a summary to monitor accuracy tensor
-tf.summary.scalar("Accuracy_LeNet-5_Adam", acc)
-# Merge all summaries into a single op
-merged_summary_op = tf.summary.merge_all()
 
 with tf.Session() as sess:
 	t0 = time.time()
@@ -232,5 +224,4 @@ with tf.Session() as sess:
 	#print("Model saved")
 
 	# Test model
-	# Print the accuracy on testing data
-	print("Accuracy:", acc.eval({x: X_test, y: y_test}))
+	print("Accuracy:", evaluate(X_test, y_test))
