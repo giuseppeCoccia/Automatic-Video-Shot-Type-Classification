@@ -19,7 +19,7 @@ def SCNN(image):
 	# your inmplementation goes here
 
 	# Layer 1: Convolutional. Input = 32x32x3. Output = 30x30x32.
-	conv1_W = weight_variable(shape=(3, 3, 1, 32))
+	conv1_W = weight_variable(shape=(3, 3, 3, 32))
 	conv1_b = bias_variable(shape = [32])
 	conv1_output = tf.nn.conv2d(image, conv1_W, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
 	# Activation.
@@ -36,14 +36,13 @@ def SCNN(image):
 	fc0_output = flatten(conv2_output)
 
 	# Dense
-	dns1_output = tf.layer.dense(fc0_output, 64, activation=tf.nn.relu)
+	dns1_output = tf.layers.dense(fc0_output, 64, activation=tf.nn.relu)
 
 	# Dropout
 	dns1_output = tf.nn.dropout(dns1_output, keep_prob=0.75)
 
 	# Dense
-	dns2_output = tf.layer.dense(fc0_output, 1, activation=tf.nn.sigmoid)
-
+	dns2_output = tf.layers.dense(fc0_output, 1, activation=tf.nn.sigmoid)
 	return dns2_output
 
 # encoding
@@ -126,10 +125,11 @@ for path in train_paths:
 	listlabels += labels[:42]
 
 # load images
-loaded_imgs = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs]
+loaded_imgs = [load_image(img, size=32).reshape((32, 32, 3)) for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images', loaded_imgs[0].shape, 'and', len(listlabels), 'labels')
-u, y_train = encode(listlabels)
+u, y_train = np.unique(np.array(listlabels), return_inverse=True)
 X_train = loaded_imgs
+y_train = [[x] for x in y_train]
 print('Categories: ', u)
 
 
@@ -139,11 +139,10 @@ for path in validation_paths:
 	imgs, labels = read_images(path)
 	listimgs_v += imgs
 	listlabels_v += labels
-loaded_imgs_v = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_v]
+loaded_imgs_v = [load_image(img, size=32).reshape((32, 32, 3)) for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 X_validation = loaded_imgs_v
-_, y_validation = encode(listlabels_v, [np.argwhere(u == label) for label in listlabels_v], u)
-
+y_validation = [np.argwhere(u == label)[0] for label in listlabels_v]
 
 ### test images
 listimgs_t, listlabels_t = [], []
@@ -151,11 +150,10 @@ for path in test_paths:
 	imgs, labels = read_images(path)
 	listimgs_t += imgs
 	listlabels_t += labels
-loaded_imgs_t = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_t]
+loaded_imgs_t = [load_image(img, size=32).reshape((32, 32, 3)) for img in listimgs_t]
 print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 X_test = loaded_imgs_t
-_, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabels_t], u)
-
+y_test = [np.argwhere(u == label)[0] for label in listlabels_t]
 
 
 ##### MODEL #####
@@ -170,14 +168,14 @@ display_step = 1
 # Model, loss function and accuracy
 
 # tf Graph Input:  mnist data image of shape 28*28=784
-x = tf.placeholder(tf.float32, (None, 32, 32, 1), name='InputData')
+x = tf.placeholder(tf.float32, (None, 32, 32, 3), name='InputData')
 # 0-9 digits recognition,  10 classes
-y = tf.placeholder(tf.int32, [None, len(u)], name='LabelData')
+y = tf.placeholder(tf.int32, [None, 1], name='LabelData')
 
 # Construct model and encapsulating all ops into scopes, making Tensorboard's Graph visualization more convenient
 with tf.name_scope('Model'):
 	# Model
-	pred = LeNet5(x)
+	pred = SCNN(x)
 with tf.name_scope('Loss'):
 	# Minimize error using cross entropy
 	cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=pred)
