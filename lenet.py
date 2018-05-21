@@ -1,11 +1,12 @@
 import tensorflow as tf
-import json
+import time
 import os
 import numpy as np
 import cv2
 from utils import *
 import argparse
 from sklearn.utils import shuffle
+from tensorflow.contrib.layers import flatten
 
 # Functions for weigths and bias initilization
 def weight_variable(shape):
@@ -55,8 +56,8 @@ def LeNet5(image):
 	fc2_output = tf.nn.relu(fc2_output)
 
 	# Layer 5: Fully Connected. Input = 84. Output = 10.
-	fc3_W = weight_variable(shape=(84, 10))
-	fc3_b = bias_variable(shape = [10])
+	fc3_W = weight_variable(shape=(84, 3))
+	fc3_b = bias_variable(shape = [3])
 	fc3_output = tf.matmul(fc2_output, fc3_W) + fc3_b
 
 	return fc3_output
@@ -68,6 +69,20 @@ def encode(labels):
 	onehot_y[np.arange(indices.size), indices] = 1
 	return u, onehot_y
 
+def evaluate(logits, labels, batch_size=32):
+    # logits will be the outputs of your model, labels will be one-hot vectors corresponding to the actual labels
+    # logits and labels are numpy arrays
+    # this function should return the accuracy of your model
+    num_examples = len(logits)
+    total_accuracy = 0
+    sess = tf.get_default_session()
+    
+    for offset in range(0, num_examples, batch_size):
+        batch_x, batch_y = logits[offset:offset+batch_size], labels[offset:offset+batch_size]
+        accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y})
+        total_accuracy += (accuracy * len(batch_x))
+        
+    return total_accuracy / num_examples
 
 def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
 	# optimizer and cost are the same kinds of objects as in Section 1
@@ -79,7 +94,7 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
 	# Training cycle
 	for epoch in range(n_epochs):
 		avg_cost = 0.
-		total_batch = int(len(X_train)/batch_size)
+		total_batch = int(len(X_train)/batch_size) if len(X_train) % batch_size == 0 else int(len(X_train)/batch_size)+1
 		# Loop over all batches
 		X_train, y_train = shuffle(X_train, y_train)
 		for offset in range(0, len(X_train), batch_size):
@@ -95,7 +110,8 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost, merged_summary_op):
 		# Display logs per epoch step
 		if (epoch+1) % display_step == 0:
 			print("Epoch: ", '%02d' % (epoch+1), "  =====> Loss=", "{:.9f}".format(avg_cost),
-				  "  =====> Training Accuracy={:.3f}", evaluate(X_validation, y_validation))
+				  "  =====> Training Accuracy=", evaluate(X_train, y_train),
+				  "  =====> Validation Accuracy=", evaluate(X_validation, y_validation))
 
 print("Optimization Finished!")
 #summary_writer.flush()
@@ -103,7 +119,6 @@ print("Optimization Finished!")
 
 ### START EXECUTION
 parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
-parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50, 152], help='chose pretrained model')
 parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
 parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
 parser.add_argument('-test', nargs='+', help='path to test directory')
@@ -125,8 +140,8 @@ for path in train_paths:
 	listlabels += labels[:42]
 
 # load images
-loaded_imgs = [load_image(img).reshape((32, 32, 3)) for img in listimgs]
-print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
+loaded_imgs = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs]
+print('[TRAINING] Loaded', len(loaded_imgs), 'images', loaded_imgs[0].shape, 'and', len(listlabels), 'labels')
 u, onehot_y = encode(listlabels)
 print('Categories: ', u)
 X_train = loaded_imgs
@@ -139,10 +154,11 @@ for path in validation_paths:
 	imgs, labels = read_images(path)
 	listimgs_v += imgs
 	listlabels_v += labels
-loaded_imgs_v = [load_image(img).reshape((32, 32, 3)) for img in listimgs_v]
+loaded_imgs_v = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 X_validation = loaded_imgs_v
-y_validation = [np.argwhere(u == label) for label in listlabels_v]
+y_validation = np.zeros((len(listlabels_v), len(u)))
+y_validation[np.arange(len(listlabels_v)), [np.argwhere(u == label) for label in listlabels_v]] = 1
 
 
 ### test images
@@ -151,11 +167,11 @@ for path in test_paths:
 	imgs, labels = read_images(path)
 	listimgs_t += imgs
 	listlabels_t += labels
-loaded_imgs_t = [load_image(img).reshape((32, 32, 3)) for img in listimgs_t]
+loaded_imgs_t = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_t]
 print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 X_test = loaded_imgs_t
-y_test = [np.argwhere(u == label) for label in listlabels_t]
-
+y_test = np.zeros((len(listlabels_t), len(u)))
+y_test[np.arange(len(listlabels_t)), [np.argwhere(u == label) for label in listlabels_t]] = 1
 
 
 ##### MODEL #####
@@ -165,12 +181,12 @@ tf.reset_default_graph() # reset the default graph before defining a new model
 learning_rate = 0.001
 training_epochs = 40
 batch_size = 128
-display_step = 10
+display_step = 1
 
 # Model, loss function and accuracy
 
 # tf Graph Input:  mnist data image of shape 28*28=784
-x = tf.placeholder(tf.float32, (None, 32, 32, 3), name='InputData')
+x = tf.placeholder(tf.float32, (None, 32, 32, 1), name='InputData')
 # 0-9 digits recognition,  10 classes
 y = tf.placeholder(tf.int32, [None, len(u)], name='LabelData')
 
@@ -212,16 +228,9 @@ with tf.Session() as sess:
 	print("Training time:", t1-t0)
 
 	# saving model
-	saver.save(sess, './LeNet_Adam')
-	print("Model saved")
+	#saver.save(sess, './LeNet_Adam')
+	#print("Model saved")
 
 	# Test model
 	# Print the accuracy on testing data
 	print("Accuracy:", acc.eval({x: X_test, y: y_test}))
-
-
-# saving new model
-tf.train.export_meta_graph(filename='lenet_model.meta')
-saver = tf.train.Saver()
-save_path = saver.save(sess, "lenet_model.ckpt")
-print("Model saved")

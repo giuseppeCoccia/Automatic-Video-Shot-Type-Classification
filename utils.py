@@ -19,7 +19,7 @@ def save_features(features, filename="img_features.json"):
 
 # image of shape [224, 224, 3]
 # [height, width, depth]
-def load_image(path, size=224):
+def load_image(path, size=224, grayscale=False):
     img = cv2.imread(path)
     #short_edge = min(img.shape[:2])
     #yy = int((img.shape[0] - short_edge) / 2)
@@ -27,6 +27,8 @@ def load_image(path, size=224):
     #crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
     #resized_img = cv2.resize(crop_img, (size, size))
     resized_img = cv2.resize(img, (size, size))
+    if(grayscale):
+        resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
     return resized_img
 
 

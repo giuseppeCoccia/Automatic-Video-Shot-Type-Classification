@@ -1,5 +1,4 @@
 import tensorflow as tf
-import json
 import os
 import numpy as np
 import cv2
@@ -7,7 +6,9 @@ from utils import *
 import argparse
 from sklearn.utils import shuffle
 
+# train params
 epochs = 20
+batch_size = 50
 learning_rate = 0.001
 FC_WEIGHT_STDDEV = 0.01
 
@@ -21,7 +22,6 @@ def loss(logits, labels):
     #regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     #loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
     loss_ = cross_entropy_mean
-    #tf.summary.scalar('loss', loss_)
     
     return loss_
 
@@ -86,8 +86,6 @@ graph = tf.get_default_graph()
 features_tensor = graph.get_tensor_by_name("avg_pool:0")
 images = graph.get_tensor_by_name("images:0")
 
-#print('Completed running ResNet') # features now containes avg_pool output
-
 
 
 
@@ -101,12 +99,12 @@ print('Categories: ', u)
 num_categories = len(u)
 
 # get avg pool dimensions
-batch_size, num_units_in = features_tensor.get_shape().as_list()
+b_size, num_units_in = features_tensor.get_shape().as_list()
 
 # define placeholder that will contain the inputs of the new layer
-bottleneck_input = tf.placeholder(tf.float32, shape=[batch_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
+bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
 # define placeholder for the categories
-labelsVar = tf.placeholder(tf.int32, shape=[batch_size], name='labelsVar')
+labelsVar = tf.placeholder(tf.int32, shape=[b_size], name='labelsVar')
 
 
 # weights and biases
@@ -130,24 +128,35 @@ sess.run(init)
 for epoch in range(epochs):
 	# shuffle dataset
 	X_train, y_train = shuffle(loaded_imgs, indices)
+	avg_cost = 0
+	total_batch = int(len(X_train)/batch_size) if (len(X_train) % batch_size) == 0 else int(len(X_train)/batch_size)+1
+	for offset in range(0, len(X_train), batch_size):
+		batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
 
-	# get features and optimize
-	features = sess.run(features_tensor, feed_dict={images: X_train}) # Run the ResNet on loaded images
-	# save file with avg_pool output
-	#save_features(features)
-	# apply tanh transformation
-	features = [np.tanh(array) for array in features]
-	#features = [np.log1p(array) for array in features]
-	# run session
-	_, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: y_train})
+		# get features and optimize
+		features = sess.run(features_tensor, feed_dict={images: batch_xs}) # Run the ResNet on loaded images
+		# save file with avg_pool output
+		#save_features(features)
+		# apply tanh transformation
+		features = [np.tanh(array) for array in features]
+		#features = [np.log1p(array) for array in features]
+		# run session
+		_, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: batch_ys})
+		avg_cost += loss / total_batch
 
 	# print accuracy
+	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs})
+	features = [np.tanh(array) for array in features]
+	#features = [np.log1p(array) for array in features]
+	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+	acc_t = accuracy(listlabels, [u[np.argmax(probability)] for probability in prob])
+	
 	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
 	features = [np.tanh(array) for array in features]
 	#features = [np.log1p(array) for array in features]
 	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-	acc = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
-	print(epoch+1, ": Loss", loss, "- Training Accuracy", acc)
+	acc_v = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
+	print(epoch+1, ": Training Loss", avg_cost, "-Training Accuracy", acc_t, "- Validation Accuracy", acc_v)
 print("Completed training")
 
 
@@ -156,9 +165,6 @@ tf.train.export_meta_graph(filename='new_model.meta')
 saver = tf.train.Saver()
 save_path = saver.save(sess, "new_model.ckpt")
 print("Model saved")
-
-
-
 
 
 
