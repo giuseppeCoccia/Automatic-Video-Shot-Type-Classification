@@ -34,40 +34,40 @@ def SCNN(image):
 
 	# Flatten
 	fc0_output = flatten(conv2_output)
-    
-    # Dense
-    dns1_output = tf.layer.dense(fc0_output, 64, activation=tf.nn.relu)
 
-    # Dropout
+	# Dense
+	dns1_output = tf.layer.dense(fc0_output, 64, activation=tf.nn.relu)
+
+	# Dropout
 	dns1_output = tf.nn.dropout(dns1_output, keep_prob=0.75)
-    
-    # Dense
-    dns2_output = tf.layer.dense(fc0_output, 1, activation=tf.nn.sigmoid)
+
+	# Dense
+	dns2_output = tf.layer.dense(fc0_output, 1, activation=tf.nn.sigmoid)
 
 	return dns2_output
 
 # encoding
 def encode(labels, indices=None, u=None):
-    if(indices is None):
-        u, indices = np.unique(np.array(labels), return_inverse=True)
-    onehot_y = np.zeros((len(labels), len(u)))
-    onehot_y[np.arange(len(labels)), indices] = 1
-    return u, onehot_y
+	if(indices is None):
+		u, indices = np.unique(np.array(labels), return_inverse=True)
+	onehot_y = np.zeros((len(labels), len(u)))
+	onehot_y[np.arange(len(labels)), indices] = 1
+	return u, onehot_y
 
 def evaluate(logits, labels, batch_size=32):
-    # logits will be the outputs of your model, labels will be one-hot vectors corresponding to the actual labels
-    # logits and labels are numpy arrays
-    # this function should return the accuracy of your model
-    num_examples = len(logits)
-    total_accuracy = 0
-    sess = tf.get_default_session()
-    
-    for offset in range(0, num_examples, batch_size):
-        batch_x, batch_y = logits[offset:offset+batch_size], labels[offset:offset+batch_size]
-        accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y})
-        total_accuracy += (accuracy * len(batch_x))
-        
-    return total_accuracy / num_examples
+	# logits will be the outputs of your model, labels will be one-hot vectors corresponding to the actual labels
+	# logits and labels are numpy arrays
+	# this function should return the accuracy of your model
+	num_examples = len(logits)
+	total_accuracy = 0
+	sess = tf.get_default_session()
+
+	for offset in range(0, num_examples, batch_size):
+		batch_x, batch_y = logits[offset:offset+batch_size], labels[offset:offset+batch_size]
+		accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y})
+		total_accuracy += (accuracy * len(batch_x))
+		
+	return total_accuracy / num_examples
 
 def train(init, sess, n_epochs, batch_size, optimizer, cost):
 	# optimizer and cost are the same kinds of objects as in Section 1
