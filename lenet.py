@@ -75,12 +75,12 @@ def evaluate(logits, labels, batch_size=32):
     num_examples = len(logits)
     total_accuracy = 0
     sess = tf.get_default_session()
-    
+
     for offset in range(0, num_examples, batch_size):
         batch_x, batch_y = logits[offset:offset+batch_size], labels[offset:offset+batch_size]
         accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y})
         total_accuracy += (accuracy * len(batch_x))
-        
+
     return total_accuracy / num_examples
 
 def train(init, sess, n_epochs, batch_size, optimizer, cost):
@@ -88,8 +88,8 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost):
 	# Train your model
 	global X_train, y_train, X_validation, y_validation
 	sess.run(init)
-	# op to write logs to Tensorboard
-	#summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
+	
+	losses, train_accs, val_accs = [], [], []
 	# Training cycle
 	for epoch in range(n_epochs):
 		avg_cost = 0.
@@ -100,18 +100,22 @@ def train(init, sess, n_epochs, batch_size, optimizer, cost):
 			batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
 			# Run optimization op (backprop), cost op (to get loss value)
 			# and summary nodes
-			_, c  = sess.run([optimizer, cost],
-									 feed_dict={x: batch_xs, y: batch_ys})
-									 # Write logs at every iteration
-									 #summary_writer.add_summary(summary, epoch * total_batch + i)
-									 # Compute average loss
+			_, c  = sess.run([optimizer, cost], feed_dict={x: batch_xs, y: batch_ys})
+			# Compute average loss
 			avg_cost += c / total_batch
 		# Display logs per epoch step
+		train_acc = evaluate(X_train, y_train)
+		val_acc = evaluate(X_validation, y_validation)
+
+		losses.append(avg_cost)
+		train_accs.append(train_acc)
+		val_accs.append(val_acc)
+
 		if (epoch+1) % display_step == 0:
 			print("Epoch: ", '%02d' % (epoch+1), "  =====> Loss=", "{:.9f}".format(avg_cost),
-				  "  =====> Training Accuracy=", evaluate(X_train, y_train),
-				  "  =====> Validation Accuracy=", evaluate(X_validation, y_validation))
-
+				  "  =====> Training Accuracy=", train_acc,
+				  "  =====> Validation Accuracy=", val_acc)
+	return losses, train_accs, val_accs
 print("Optimization Finished!")
 
 
@@ -121,23 +125,33 @@ parser = argparse.ArgumentParser(description="Script for retraining last layer o
 parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
 parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
 parser.add_argument('-test', nargs='+', help='path to test directory')
+parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
+parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
+parser.add_argument('-e', '--epochs', nargs='?', type=int, default=20, help='number of epochs')
 
 args = parser.parse_args()
 train_paths = args.train
 validation_paths = args.validation
 test_paths = args.test
 
+# Parameters
+learning_rate = args.learning_rate 
+training_epochs = args.epochs
+batch_size = 50
+display_step = 1
+csv_out = args.csv_output
 
 
-##### LOAD IMAGES ######
+
+##### LOAD IMAGES #####
 
 ### training images
 # read images
 listimgs, listlabels = [], []
 for path in train_paths:
 	imgs, labels = read_images(path)
-	listimgs += imgs[:42]
-	listlabels += labels[:42]
+	listimgs += imgs
+	listlabels += labels
 
 # load images
 loaded_imgs = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs]
@@ -175,12 +189,6 @@ _, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabel
 ##### MODEL #####
 tf.reset_default_graph() # reset the default graph before defining a new model
 
-# Parameters
-learning_rate = 0.001
-training_epochs = 40
-batch_size = 128
-display_step = 1
-
 # Model, loss function and accuracy
 
 # tf Graph Input:  mnist data image of shape 28*28=784
@@ -214,7 +222,7 @@ init = tf.global_variables_initializer()
 
 with tf.Session() as sess:
 	t0 = time.time()
-	train(init, sess, training_epochs, batch_size, optimizer, cost)
+	losses, train_accs, val_acc =strain(init, sess, training_epochs, batch_size, optimizer, cost)
 	t1 = time.time()
 
 	print("Training time:", t1-t0)
@@ -225,3 +233,6 @@ with tf.Session() as sess:
 
 	# Test model
 	print("Accuracy:", evaluate(X_test, y_test))
+
+	if csv_out is not None:
+		export_csv(losses, train_accs, val_accs, filename=csv_out)
