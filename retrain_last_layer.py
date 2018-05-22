@@ -6,12 +6,6 @@ from utils import *
 import argparse
 from sklearn.utils import shuffle
 
-# train params
-epochs = 20
-batch_size = 50
-learning_rate = 0.001
-FC_WEIGHT_STDDEV = 0.01
-
 
 ##### UTILS #####
 # cross entropy loss, as it is a classification problem it is better
@@ -28,15 +22,28 @@ def loss(logits, labels):
 
 ### START EXECUTION
 parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
+parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
+parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
+parser.add_argument('-e', '--epochs', nargs='?', type=int, default=20, help='number of epochs')
+parser.add_argument('-transform', '--transformation', nargs='?', type=str, default='tanh', choices=['tanh', 'log1p'], help='transformation to be used on the features')
 parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50, 152], help='chose pretrained model')
 parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
 parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
-parser.add_argument('-test', nargs='+', help='path to test directory')
+parser.add_argument('-test', nargs='+', help='paths to test directory')
 
 args = parser.parse_args()
 train_paths = args.train
 validation_paths = args.validation
 test_paths = args.test
+
+# train params
+epochs = args.epochs
+transform = args.transformation
+batch_size = 50
+learning_rate = args.learning_rate
+csv_out = args.csv_output
+FC_WEIGHT_STDDEV = 0.01
+
 
 
 ##### LOAD IMAGES ######
@@ -46,8 +53,8 @@ test_paths = args.test
 listimgs, listlabels = [], []
 for path in train_paths:
 	imgs, labels = read_images(path)
-	listimgs += imgs[:42]
-	listlabels += labels[:42]
+	listimgs += imgs
+	listlabels += labels
 
 # load images
 loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
@@ -125,10 +132,12 @@ train_op = ops.minimize(loss_)
 init=tf.global_variables_initializer()
 sess.run(init)
 
+losses, train_accs, val_accs = [], [], []
 for epoch in range(epochs):
 	# shuffle dataset
 	X_train, y_train = shuffle(loaded_imgs, indices)
 	avg_cost = 0
+	avg_acc = 0
 	total_batch = int(len(X_train)/batch_size) if (len(X_train) % batch_size) == 0 else int(len(X_train)/batch_size)+1
 	for offset in range(0, len(X_train), batch_size):
 		batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
@@ -137,26 +146,31 @@ for epoch in range(epochs):
 		features = sess.run(features_tensor, feed_dict={images: batch_xs}) # Run the ResNet on loaded images
 		# save file with avg_pool output
 		#save_features(features)
-		# apply tanh transformation
-		features = [np.tanh(array) for array in features]
-		#features = [np.log1p(array) for array in features]
+		# apply features transformation
+		if transform == 'tanh':
+			features = [np.tanh(array) for array in features]
+		elif transform == 'log1p':
+			features = [np.log1p(array) for array in features]
 		# run session
 		_, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: batch_ys})
 		avg_cost += loss / total_batch
 
-	# print accuracy
-	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs})
-	features = [np.tanh(array) for array in features]
-	#features = [np.log1p(array) for array in features]
-	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-	acc_t = accuracy(listlabels, [u[np.argmax(probability)] for probability in prob])
+		# get training accuracy
+		prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+		avg_acc += accuracy(batch_ys, [np.argmax(probability) for probability in prob]) / total_batch
+		
 	
 	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
-	features = [np.tanh(array) for array in features]
-	#features = [np.log1p(array) for array in features]
+	if transform == 'tanh':
+		features = [np.tanh(array) for array in features]
+	elif transform == 'log1p':
+		features = [np.log1p(array) for array in features]
 	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
 	acc_v = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
-	print(epoch+1, ": Training Loss", avg_cost, "-Training Accuracy", acc_t, "- Validation Accuracy", acc_v)
+	print(epoch+1, ": Training Loss", avg_cost, "-Training Accuracy", avg_acc, "- Validation Accuracy", acc_v)
+	losses.append(avg_cost)
+	train_accs.append(avg_acc)
+	val_accs.append(acc_v)
 print("Completed training")
 
 
@@ -166,11 +180,9 @@ saver = tf.train.Saver()
 save_path = saver.save(sess, "new_model.ckpt")
 print("Model saved")
 
-
-
-
-
-
+if csv_out is not None:
+	export_csv(losses, train_accs, val_accs, filename=csv_out)
+	print(csv_out, "saved")
 
 
 #### TEST ####
@@ -188,8 +200,10 @@ if test_paths is not None:
 	
 	# test
 	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_t})
-	features = [np.tanh(array) for array in features]
-	#features = [np.log1p(array) for array in features]
+	if transform == 'tanh':
+		features = [np.tanh(array) for array in features]
+	elif transform == 'log1p':
+		features = [np.log1p(array) for array in features]
 	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
 	print("PROB:", prob)
 	print([u[np.argmax(probability)] for probability in prob])

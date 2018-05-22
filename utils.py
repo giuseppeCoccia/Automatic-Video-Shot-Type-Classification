@@ -1,5 +1,8 @@
 import cv2
 import os
+import csv
+
+
 
 def checkpoint_fn(layers):
     return 'ResNet-L%d.ckpt' % layers
@@ -62,3 +65,13 @@ def accuracy(true_labels, predicted_labels):
         for t, p in zip(true_labels, predicted_labels):
                 if t == p: correct += 1
         return (correct/len(true_labels))
+
+
+def export_csv(loss, train, validation, filename='output.csv'):
+	with open(filename, 'w+') as f:
+		writer = csv.writer(f, delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+		writer.writerow(['Loss', 'Train_Accuracy', 'Validation_Accuracy'])
+		for l, t, v in zip(loss, train, validation):
+			writer.writerow([l, t, v])
+
+
