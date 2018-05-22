@@ -98,7 +98,7 @@ for key, value in sorted(frames.items()):
 		ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
 		hb_ratio = headbody_ratio(coordinates)
 		# GROS PLAN
-		if ratio > 0.25: #and ratio < 0.35
+		if ratio > 0.22: #and ratio < 0.35
 			frms['gros_plan'].append(key)
 		# PLAN MOYEN (0.006 0.01) -> 0 < h < 154
 		elif ratio > 0.006 and ratio < 0.007 and coordinates[3] < 384-230 and coordinates[3] > 384-340:

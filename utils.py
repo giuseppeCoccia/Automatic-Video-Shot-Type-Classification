@@ -29,7 +29,7 @@ def load_image(path, size=224, grayscale=False):
     #xx = int((img.shape[1] - short_edge) / 2)
     #crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
     #resized_img = cv2.resize(crop_img, (size, size))
-    resized_img = cv2.resize(img, (size, size))
+    resized_img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
     if(grayscale):
         resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
     return resized_img

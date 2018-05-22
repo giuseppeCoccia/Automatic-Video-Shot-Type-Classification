@@ -17,7 +17,7 @@ def bias_variable(shape):
 
 def SCNN(image):
 	# adding pooling layer to reduce input size
-	#image = tf.nn.max_pool(image, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
+	image = tf.nn.max_pool(image, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
 
 	# Layer 1: Convolutional. Input = 32x32x3. Output = 30x30x32.
 	conv1_W = weight_variable(shape=(3, 3, 3, 32))
@@ -149,7 +149,6 @@ u, y_train = encode(listlabels)
 X_train = loaded_imgs
 #y_train = [[x] for x in y_train]
 print('Categories: ', u)
-cv2.imwrite('img.png',loaded_imgs[0])
 
 
 ### validation images
