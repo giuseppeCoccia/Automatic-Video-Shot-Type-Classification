@@ -98,16 +98,16 @@ for key, value in sorted(frames.items()):
 		ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
 		hb_ratio = headbody_ratio(coordinates)
 		# GROS PLAN
-		if ratio > 0.22: #and ratio < 0.35
+		if ratio > 0.135:
 			frms['gros_plan'].append(key)
 		# PLAN MOYEN (0.006 0.01) -> 0 < h < 154
-		elif ratio > 0.006 and ratio < 0.007 and coordinates[3] < 384-230 and coordinates[3] > 384-340:
+		elif ratio > 0.006 and ratio < 0.0068 and coordinates[3] < 384-250 and coordinates[3] > 384-340:
 			frms['plan_moyen'].append(key)
 		# PLAN RAPPROCHE (0.03 and 0.08) -> 164 < h < 254
 		elif ratio > 0.05 and ratio < 0.06 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
 			frms['plan_rapproche'].append(key)
 		# PLAN AMERICAIN (0.01 and 0.03) -> 
-		elif ratio > 0.02 and ratio < 0.03 and coordinates[3] < 384-160:# and coordinates[3] > 384-220:
+		elif ratio > 0.02 and ratio < 0.027 and coordinates[3] < 384-160:# and coordinates[3] > 384-220:
 			frms['plan_americain'].append(key)
 		# PLAN LARGE (0 and 0.006)
 		elif ratio < 0.006 and ratio >= 0:
@@ -118,6 +118,6 @@ for key, value in sorted(frames.items()):
 		ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
 		hb_ratio = headbody_ratio(coordinates)
 		if ratio >= 0 and ratio < 0.006:
-			frms['plan_larg'].append(key)
+			frms['plan_large'].append(key)
 	old_key = key
 print(" ".join(str(x) for x in frms[mode]))

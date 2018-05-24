@@ -22,17 +22,18 @@ def save_features(features, filename="img_features.json"):
 
 # image of shape [224, 224, 3]
 # [height, width, depth]
-def load_image(path, size=224, grayscale=False):
+def load_image(path, size=224, resize=True, grayscale=False):
     img = cv2.imread(path)
     #short_edge = min(img.shape[:2])
     #yy = int((img.shape[0] - short_edge) / 2)
     #xx = int((img.shape[1] - short_edge) / 2)
     #crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
     #resized_img = cv2.resize(crop_img, (size, size))
-    resized_img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
+    if resize == True:
+    	img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
     if(grayscale):
-        resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
-    return resized_img
+        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
+    return img
 
 
 # given path to dir, return all the images (and labels) from images of that dir

@@ -124,7 +124,7 @@ test_paths = args.test
 # Parameters
 learning_rate = args.learning_rate 
 training_epochs = args.epochs
-batch_size = 128
+batch_size = 32
 display_step = 1
 csv_out = args.csv_output
 
@@ -142,12 +142,11 @@ for path in train_paths:
 	listlabels += labels
 
 # load images
-loaded_imgs = [load_image(img, size=32).reshape((32, 32, 3)) for img in listimgs]
+loaded_imgs = [load_image(img, resize=False) for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images', loaded_imgs[0].shape, 'and', len(listlabels), 'labels')
 iu, y_train = np.unique(np.array(listlabels), return_inverse=True)
 u, y_train = encode(listlabels)
 X_train = loaded_imgs
-#y_train = [[x] for x in y_train]
 print('Categories: ', u)
 
 
@@ -157,10 +156,9 @@ for path in validation_paths:
 	imgs, labels = read_images(path)
 	listimgs_v += imgs
 	listlabels_v += labels
-loaded_imgs_v = [load_image(img, size=32).reshape((32, 32, 3)) for img in listimgs_v]
+loaded_imgs_v = [load_image(img, resize=False) for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 X_validation = loaded_imgs_v
-#y_validation = [np.argwhere(u == label)[0] for label in listlabels_v]
 _, y_validation = encode(listlabels_v, [np.argwhere(u == label) for label in listlabels_v], u)
 
 if test_paths is not None:
@@ -170,16 +168,15 @@ if test_paths is not None:
 		imgs, labels = read_images(path)
 		listimgs_t += imgs
 		listlabels_t += labels
-	loaded_imgs_t = [load_image(img, size=32).reshape((32, 32, 3)) for img in listimgs_t]
+	loaded_imgs_t = [load_image(img, resize=False) for img in listimgs_t]
 	print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 	X_test = loaded_imgs_t
-	#y_test = [np.argwhere(u == label)[0] for label in listlabels_t]
 	_, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabels_t], u)
 
 
 
 
-
+img_dims = (len(loaded_imgs[0]), len(loaded_imgs[0][0]))
 
 
 ##### MODEL #####
@@ -188,9 +185,9 @@ tf.reset_default_graph() # reset the default graph before defining a new model
 # Model, loss function and accuracy
 
 # tf Graph Input:  mnist data image of shape 28*28=784
-x = tf.placeholder(tf.float32, (None, 32, 32, 3), name='InputData')
+x = tf.placeholder(tf.float32, (None, img_dims[0], img_dims[1], 3), name='InputData')
 # 0-9 digits recognition,  10 classes
-y = tf.placeholder(tf.float32, [None, 3], name='LabelData')
+y = tf.placeholder(tf.float32, [None, len(u)], name='LabelData')
 
 # Construct model and encapsulating all ops into scopes, making Tensorboard's Graph visualization more convenient
 with tf.name_scope('Model'):

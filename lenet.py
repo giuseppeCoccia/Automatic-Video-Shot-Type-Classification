@@ -173,16 +173,17 @@ X_validation = loaded_imgs_v
 _, y_validation = encode(listlabels_v, [np.argwhere(u == label) for label in listlabels_v], u)
 
 
-### test images
-listimgs_t, listlabels_t = [], []
-for path in test_paths:
-	imgs, labels = read_images(path)
-	listimgs_t += imgs
-	listlabels_t += labels
-loaded_imgs_t = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_t]
-print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
-X_test = loaded_imgs_t
-_, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabels_t], u)
+if test_paths is not None:
+	### test images
+	listimgs_t, listlabels_t = [], []
+	for path in test_paths:
+		imgs, labels = read_images(path)
+		listimgs_t += imgs
+		listlabels_t += labels
+	loaded_imgs_t = [load_image(img, size=32, grayscale=True).reshape((32, 32, 1)) for img in listimgs_t]
+	print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
+	X_test = loaded_imgs_t
+	_, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabels_t], u)
 
 
 
@@ -222,7 +223,7 @@ init = tf.global_variables_initializer()
 
 with tf.Session() as sess:
 	t0 = time.time()
-	losses, train_accs, val_acc =strain(init, sess, training_epochs, batch_size, optimizer, cost)
+	losses, train_accs, val_accs = train(init, sess, training_epochs, batch_size, optimizer, cost)
 	t1 = time.time()
 
 	print("Training time:", t1-t0)
@@ -231,8 +232,9 @@ with tf.Session() as sess:
 	#saver.save(sess, './LeNet_Adam')
 	#print("Model saved")
 
-	# Test model
-	print("Accuracy:", evaluate(X_test, y_test))
+	if test_paths is not None:
+		# Test model
+		print("Accuracy:", evaluate(X_test, y_test))
 
 	if csv_out is not None:
 		export_csv(losses, train_accs, val_accs, filename=csv_out)
