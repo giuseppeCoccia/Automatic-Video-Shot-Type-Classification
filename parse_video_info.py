@@ -14,6 +14,7 @@ file_ = sys.argv[1]+"_faces.txt"
 video_ = sys.argv[1]+".mp4"
 mode = sys.argv[2]
 
+
 #### UTILS FUNCTIONS
 # base and high of the two images
 def area_ratio(b1, h1, b2, h2):
@@ -25,10 +26,6 @@ def area_ratio(b1, h1, b2, h2):
 		return a2/a1
 	return a1/a2
 
-
-# coordinates is an array of 4 points: (x_top, y_top, x_bottom, y_bottom)
-def headbody_ratio(coordinates):
-	pass	
 
 
 # coordinates is an array of 4 points: (x_top, y_top, x_bottom, y_bottom)
@@ -67,9 +64,9 @@ cmd_ = "./get_video_resolution.sh "+video_
 p = subprocess.Popen(cmd_ , shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 stdout, stderr = p.communicate()
 dim = stdout.strip().split("x") # dim[0] = b, dim[1] = h
-
 # parse input file
 frames = {}
+
 with open(file_, "r") as f:
 	for line in f:
 		words = line.split()
@@ -87,7 +84,6 @@ with open(file_, "r") as f:
 			frames[frame] = [(x_top, y_top, x_down, y_down)]
 		else:
 			frames[frame].append((x_top, y_top, x_down, y_down))
-
 old_key = -1
 frms = {'plan_moyen':[], 'plan_rapproche':[], 'plan_americain':[], 'gros_plan':[], 'plan_large':[]}
 for key, value in sorted(frames.items()):
@@ -96,7 +92,6 @@ for key, value in sorted(frames.items()):
 	if(len(value) == 1):
 		coordinates = value[0]
 		ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-		hb_ratio = headbody_ratio(coordinates)
 		# GROS PLAN
 		if ratio > 0.135:
 			frms['gros_plan'].append(key)
@@ -116,7 +111,6 @@ for key, value in sorted(frames.items()):
 	else:
 		coordinates = value[0]
 		ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-		hb_ratio = headbody_ratio(coordinates)
 		if ratio >= 0 and ratio < 0.006:
 			frms['plan_large'].append(key)
 	old_key = key
