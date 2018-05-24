@@ -20,6 +20,89 @@ def loss(logits, labels):
     return loss_
 
 
+def resnet_model(sess, layers, num_categories, FC_WEIGHT_STDDEV=0.01):
+    # restore model
+    saver = tf.train.import_meta_graph(meta_fn(layers))
+    saver.restore(sess, checkpoint_fn(layers))
+    print("Completed restoring pretrained model")
+
+
+    # load last-but-one (layer) tensor after feeding images
+    graph = tf.get_default_graph()
+    features_tensor = graph.get_tensor_by_name("avg_pool:0")
+    images = graph.get_tensor_by_name("images:0")
+
+    # get avg pool dimensions
+    b_size, num_units_in = features_tensor.get_shape().as_list()
+
+    # define placeholder that will contain the inputs of the new layer
+    bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
+    # define placeholder for the categories
+    labelsVar = tf.placeholder(tf.int32, shape=[b_size], name='labelsVar')
+
+    # weights and biases
+    weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
+    weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
+    biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
+
+    # operations
+    logits = tf.matmul(bottleneck_input, weights)
+    logits = tf.nn.bias_add(logits, biases)
+    final_tensor = tf.nn.softmax(logits, name="final_result")
+
+    loss_ = loss(logits, labelsVar)
+    ops = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    train_op = ops.minimize(loss_)
+
+    return bottleneck_input, labelsVar, final_tensor, loss_, train_op
+
+
+def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform):
+    losses, train_accs, val_accs = [], [], []
+    for epoch in range(epochs):
+        # shuffle dataset
+        X_train, y_train = shuffle(loaded_imgs, indices)
+        avg_cost = 0
+        avg_acc = 0
+        total_batch = int(len(X_train)/batch_size) if (len(X_train) % batch_size) == 0 else int(len(X_train)/batch_size)+1
+        for offset in range(0, len(X_train), batch_size):
+            batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
+            
+            # get features and optimize
+            features = sess.run(features_tensor, feed_dict={images: batch_xs}) # Run the ResNet on loaded images
+            # save file with avg_pool output
+            #save_features(features)
+            # apply features transformation
+            if transform == 'tanh':
+                features = [np.tanh(array) for array in features]
+            elif transform == 'log1p':
+                features = [np.log1p(array) for array in features]
+            # run session
+            _, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: batch_ys})
+            avg_cost += loss / total_batch
+            
+            # get training accuracy
+            prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+            avg_acc += accuracy(batch_ys, [np.argmax(probability) for probability in prob]) / total_batch
+
+        features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
+        if transform == 'tanh':
+            features = [np.tanh(array) for array in features]
+        elif transform == 'log1p':
+            features = [np.log1p(array) for array in features]
+        prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+        acc_v = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
+        print(epoch+1, ": Training Loss", avg_cost, "-Training Accuracy", avg_acc, "- Validation Accuracy", acc_v)
+        losses.append(avg_cost)
+        train_accs.append(avg_acc)
+        val_accs.append(acc_v)
+
+        # save model
+        saver.save(sess, "resnet_model"+epoch+".ckpt")
+
+    return losses, train_accs, val_accs
+
+
 ### START EXECUTION
 parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
 parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
@@ -45,7 +128,6 @@ transform = args.transformation
 batch_size = args.batch_size
 learning_rate = args.learning_rate
 csv_out = args.csv_output
-FC_WEIGHT_STDDEV = 0.01
 
 
 
@@ -85,104 +167,38 @@ num_categories = len(u)
 
 
 ##### MODEL #####
-# load from existing model and retrain last layer
-layers = args.arch # model to be loaded
-
-
 sess = tf.Session()
-
-# restore model
-saver = tf.train.import_meta_graph(meta_fn(layers))
-saver.restore(sess, checkpoint_fn(layers))
-print("Completed restoring pretrained model")
-
-# load last-but-one (layer) tensor after feeding images
-graph = tf.get_default_graph()
-features_tensor = graph.get_tensor_by_name("avg_pool:0")
-images = graph.get_tensor_by_name("images:0")
-
-
-
-
-#### RETRAINING LAST LAYER #####
-
-## placeholders and variables
-
-# get avg pool dimensions
-b_size, num_units_in = features_tensor.get_shape().as_list()
-
-# define placeholder that will contain the inputs of the new layer
-bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
-# define placeholder for the categories
-labelsVar = tf.placeholder(tf.int32, shape=[b_size], name='labelsVar')
-
-
-# weights and biases
-weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
-weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
-biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
-
-# operations
-logits = tf.matmul(bottleneck_input, weights)
-logits = tf.nn.bias_add(logits, biases)
-final_tensor = tf.nn.softmax(logits, name="final_result")
-
-loss_ = loss(logits, labelsVar)
-ops = tf.train.AdamOptimizer(learning_rate=learning_rate)
-train_op = ops.minimize(loss_)
-
-# run training session
-init=tf.global_variables_initializer()
-sess.run(init)
-
-# get saver and export meta graph
 saver = tf.train.Saver()
-tf.train.export_meta_graph(filename='resnet_model.meta')
 
-losses, train_accs, val_accs = [], [], []
-for epoch in range(epochs):
-	# shuffle dataset
-	X_train, y_train = shuffle(loaded_imgs, indices)
-	avg_cost = 0
-	avg_acc = 0
-	total_batch = int(len(X_train)/batch_size) if (len(X_train) % batch_size) == 0 else int(len(X_train)/batch_size)+1
-	for offset in range(0, len(X_train), batch_size):
-		batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
+if model_path is None:
+    # load from existing model and retrain last layer
+    layers = args.arch # model to be loaded
+    bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories)
 
-		# get features and optimize
-		features = sess.run(features_tensor, feed_dict={images: batch_xs}) # Run the ResNet on loaded images
-		# save file with avg_pool output
-		#save_features(features)
-		# apply features transformation
-		if transform == 'tanh':
-			features = [np.tanh(array) for array in features]
-		elif transform == 'log1p':
-			features = [np.log1p(array) for array in features]
-		# run session
-		_, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: batch_ys})
-		avg_cost += loss / total_batch
+    # run training session
+    init=tf.global_variables_initializer()
+    sess.run(init)
 
-		# get training accuracy
-		prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-		avg_acc += accuracy(batch_ys, [np.argmax(probability) for probability in prob]) / total_batch
-		
-	
-	features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
-	if transform == 'tanh':
-		features = [np.tanh(array) for array in features]
-	elif transform == 'log1p':
-		features = [np.log1p(array) for array in features]
-	prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
-	acc_v = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
-	print(epoch+1, ": Training Loss", avg_cost, "-Training Accuracy", avg_acc, "- Validation Accuracy", acc_v)
-	losses.append(avg_cost)
-	train_accs.append(avg_acc)
-	val_accs.append(acc_v)
+    # export meta graph
+    tf.train.export_meta_graph(filename='resnet_model.meta')
 
-	# save model
-	saver.save(sess, "resnet_model"+epoch+".ckpt")
-print("Model saved")
-print("Completed training")
+    losses, train_accs, val_accs = train(sess,
+                                         loaded_imgs,
+                                         listlabels_v,
+                                         loaded_imgs_v,
+                                         indices,
+                                         u,
+                                         images,
+                                         features_tensor,
+                                         bottleneck_input,
+                                         labelsVar,
+                                         final_tensor,
+                                         loss_,
+                                         train_op,
+                                         epochs,
+                                         batch_size,
+                                         transform)
+    print("Completed training")
 
 
 if csv_out is not None:
