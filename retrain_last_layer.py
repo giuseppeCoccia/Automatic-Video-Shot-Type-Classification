@@ -24,6 +24,8 @@ def loss(logits, labels):
 parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
 parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
 parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
+parser.add_argument('-m', '--model_path', nargs='?', type=str, help='path of the model to be restored')
+parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=32, help='batch size for training batches')
 parser.add_argument('-e', '--epochs', nargs='?', type=int, default=20, help='number of epochs')
 parser.add_argument('-transform', '--transformation', nargs='?', type=str, default='tanh', choices=['tanh', 'log1p'], help='transformation to be used on the features')
 parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50, 152], help='chose pretrained model')
@@ -35,11 +37,12 @@ args = parser.parse_args()
 train_paths = args.train
 validation_paths = args.validation
 test_paths = args.test
+model_path = args.model_path
 
 # train params
 epochs = args.epochs
 transform = args.transformation
-batch_size = 50
+batch_size = args.batch_size
 learning_rate = args.learning_rate
 csv_out = args.csv_output
 FC_WEIGHT_STDDEV = 0.01
@@ -71,6 +74,11 @@ loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 
 
+# map string labels to unique integers
+u,indices = np.unique(np.array(listlabels), return_inverse=True)
+print('Categories: ', u)
+num_categories = len(u)
+
 
 
 
@@ -84,8 +92,8 @@ layers = args.arch # model to be loaded
 sess = tf.Session()
 
 # restore model
-new_saver = tf.train.import_meta_graph(meta_fn(layers))
-new_saver.restore(sess, checkpoint_fn(layers))
+saver = tf.train.import_meta_graph(meta_fn(layers))
+saver.restore(sess, checkpoint_fn(layers))
 print("Completed restoring pretrained model")
 
 # load last-but-one (layer) tensor after feeding images
@@ -99,11 +107,6 @@ images = graph.get_tensor_by_name("images:0")
 #### RETRAINING LAST LAYER #####
 
 ## placeholders and variables
-
-# map string labels to unique integers
-u,indices = np.unique(np.array(listlabels), return_inverse=True)
-print('Categories: ', u)
-num_categories = len(u)
 
 # get avg pool dimensions
 b_size, num_units_in = features_tensor.get_shape().as_list()
@@ -131,6 +134,10 @@ train_op = ops.minimize(loss_)
 # run training session
 init=tf.global_variables_initializer()
 sess.run(init)
+
+# get saver and export meta graph
+saver = tf.train.Saver()
+tf.train.export_meta_graph(filename='resnet_model.meta')
 
 losses, train_accs, val_accs = [], [], []
 for epoch in range(epochs):
@@ -171,14 +178,12 @@ for epoch in range(epochs):
 	losses.append(avg_cost)
 	train_accs.append(avg_acc)
 	val_accs.append(acc_v)
+
+	# save model
+	saver.save(sess, "resnet_model"+epoch+".ckpt")
+print("Model saved")
 print("Completed training")
 
-
-# saving new model
-tf.train.export_meta_graph(filename='new_model.meta')
-saver = tf.train.Saver()
-save_path = saver.save(sess, "new_model.ckpt")
-print("Model saved")
 
 if csv_out is not None:
 	export_csv(losses, train_accs, val_accs, filename=csv_out)
