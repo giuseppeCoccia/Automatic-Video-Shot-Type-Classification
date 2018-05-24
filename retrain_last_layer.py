@@ -11,7 +11,7 @@ from sklearn.utils import shuffle
 # cross entropy loss, as it is a classification problem it is better
 def loss(logits, labels):
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
-    cross_entropy_mean = tf.reduce_mean(cross_entropy)
+    cross_entropy_mean = tf.reduce_mean(cross_entropy, name="loss")
     
     #regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     #loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
@@ -36,7 +36,7 @@ def resnet_model(sess, layers, num_categories, FC_WEIGHT_STDDEV=0.01):
     b_size, num_units_in = features_tensor.get_shape().as_list()
 
     # define placeholder that will contain the inputs of the new layer
-    bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInputPlaceholder') # define the input tensor
+    bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInput') # define the input tensor
     # define placeholder for the categories
     labelsVar = tf.placeholder(tf.int32, shape=[b_size], name='labelsVar')
 
@@ -52,9 +52,9 @@ def resnet_model(sess, layers, num_categories, FC_WEIGHT_STDDEV=0.01):
 
     loss_ = loss(logits, labelsVar)
     ops = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    train_op = ops.minimize(loss_)
+    train_op = ops.minimize(loss_, name="train_op")
 
-    return bottleneck_input, labelsVar, final_tensor, loss_, train_op
+    return images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
 def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform):
@@ -98,7 +98,8 @@ def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, fe
         val_accs.append(acc_v)
 
         # save model
-        saver.save(sess, "resnet_model"+epoch+".ckpt")
+        saver = tf.train.Saver()
+        saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
 
     return losses, train_accs, val_accs
 
@@ -107,7 +108,7 @@ def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, fe
 parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
 parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
 parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
-parser.add_argument('-m', '--model_path', nargs='?', type=str, help='path of the model to be restored')
+parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='epoch number of the model to be restored')
 parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=32, help='batch size for training batches')
 parser.add_argument('-e', '--epochs', nargs='?', type=int, default=20, help='number of epochs')
 parser.add_argument('-transform', '--transformation', nargs='?', type=str, default='tanh', choices=['tanh', 'log1p'], help='transformation to be used on the features')
@@ -120,7 +121,7 @@ args = parser.parse_args()
 train_paths = args.train
 validation_paths = args.validation
 test_paths = args.test
-model_path = args.model_path
+model_to_restore = args.model_epoch
 
 # train params
 epochs = args.epochs
@@ -168,12 +169,11 @@ num_categories = len(u)
 
 ##### MODEL #####
 sess = tf.Session()
-saver = tf.train.Saver()
 
-if model_path is None:
+if model_to_restore is None:
     # load from existing model and retrain last layer
     layers = args.arch # model to be loaded
-    bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories)
+    images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories)
 
     # run training session
     init=tf.global_variables_initializer()
@@ -199,7 +199,37 @@ if model_path is None:
                                          batch_size,
                                          transform)
     print("Completed training")
+else:
+	# restore model
+	new_saver = tf.train.import_meta_graph("resnet_model.meta")
+	new_saver.restore(sess, "resnet_model"+str(model_to_restore)+".ckpt")
+	print("Restored Model")
 
+	graph = tf.get_default_graph()
+	features_tensor = graph.get_tensor_by_name("avg_pool:0")	
+	images = graph.get_tensor_by_name("images:0")
+	bottleneck_input = graph.get_tensor_by_name("BottleneckInput:0")
+	labelsVar = graph.get_tensor_by_name("labelsVar:0")
+	final_tensor = graph.get_tensor_by_name("final_result:0")
+	loss_ = graph.get_tensor_by_name("loss:0")
+	train_op = graph.get_operation_by_name("train_op")
+
+	losses, train_accs, val_accs = train(sess,
+                                         loaded_imgs,
+                                         listlabels_v,
+                                         loaded_imgs_v,
+                                         indices,
+                                         u,
+                                         images,
+                                         features_tensor,
+                                         bottleneck_input,
+                                         labelsVar,
+                                         final_tensor,
+                                         loss_,
+                                         train_op,
+                                         epochs,
+                                         batch_size,
+                                         transform)
 
 if csv_out is not None:
 	export_csv(losses, train_accs, val_accs, filename=csv_out)
