@@ -98,8 +98,8 @@ def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, fe
         val_accs.append(acc_v)
 
         # save model
-        saver = tf.train.Saver()
-        saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
+        #saver = tf.train.Saver()
+        #saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
 
     return losses, train_accs, val_accs
 
