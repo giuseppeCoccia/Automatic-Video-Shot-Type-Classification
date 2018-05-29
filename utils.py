@@ -32,7 +32,7 @@ def load_image(path, size=224, resize=True, grayscale=False):
     if resize == True:
     	img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
     if(grayscale):
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     return img
 
 

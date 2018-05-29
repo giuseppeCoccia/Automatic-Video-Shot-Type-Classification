@@ -20,7 +20,7 @@ def loss(logits, labels):
     return loss_
 
 
-def resnet_model(sess, layers, num_categories, FC_WEIGHT_STDDEV=0.01):
+def resnet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     # restore model
     saver = tf.train.import_meta_graph(meta_fn(layers))
     saver.restore(sess, checkpoint_fn(layers))
@@ -30,6 +30,8 @@ def resnet_model(sess, layers, num_categories, FC_WEIGHT_STDDEV=0.01):
     # load last-but-one (layer) tensor after feeding images
     graph = tf.get_default_graph()
     features_tensor = graph.get_tensor_by_name("avg_pool:0")
+    if(dropout == True):
+	    features_tensor = tf.nn.dropout(features_tensor, keep_prob=0.75)
     images = graph.get_tensor_by_name("images:0")
 
     # get avg pool dimensions
@@ -98,8 +100,8 @@ def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, fe
         val_accs.append(acc_v)
 
         # save model
-        #saver = tf.train.Saver()
-        #saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
+        saver = tf.train.Saver()
+        saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
 
     return losses, train_accs, val_accs
 
@@ -116,6 +118,7 @@ parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50
 parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
 parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
 parser.add_argument('-test', nargs='+', help='paths to test directory')
+parser.add_argument('-dropout', nargs='?', type=bool, default=False, help='Use or not dropout of features going to last fully connected layer')
 
 args = parser.parse_args()
 train_paths = args.train
@@ -129,6 +132,7 @@ transform = args.transformation
 batch_size = args.batch_size
 learning_rate = args.learning_rate
 csv_out = args.csv_output
+dropout = args.dropout
 
 
 
@@ -173,7 +177,7 @@ sess = tf.Session()
 if model_to_restore is None:
     # load from existing model and retrain last layer
     layers = args.arch # model to be loaded
-    images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories)
+    images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories, dropout)
 
     # run training session
     init=tf.global_variables_initializer()

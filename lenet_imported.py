@@ -15,51 +15,6 @@ def bias_variable(shape):
 	initial = tf.constant(0., shape=shape)
 	return tf.Variable(initial)
 
-def LeNet5(image):
-	# your inmplementation goes here
-
-	# Layer 1: Convolutional. Input = 32x32x1. Output = 28x28x6.
-	conv1_W = weight_variable(shape=(5, 5, 1, 6))
-	conv1_b = bias_variable(shape = [6])
-	conv1_output = tf.nn.conv2d(image, conv1_W, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
-	# Activation.
-	conv1_output = tf.nn.relu(conv1_output)
-	# Pooling. Input = 28x28x6. Output = 14x14x6.
-	conv1_output = tf.nn.max_pool(conv1_output, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
-
-	# Layer 2: Convolutional. Input = 14x14x6. Output = 10x10x16.
-	conv2_W = weight_variable(shape=(5, 5, 6, 16))
-	conv2_b = bias_variable(shape = [16])
-	conv2_output   = tf.nn.conv2d(conv1_output, conv2_W, strides=[1, 1, 1, 1], padding='VALID') + conv2_b
-	# Activation.
-	conv2_output = tf.nn.relu(conv2_output)
-	# Pooling. Input = 10x10x16. Output = 5x5x16.
-	conv2_output = tf.nn.max_pool(conv2_output, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
-
-	# Flatten. Input = 5x5x16. Output = 400.
-	fc0_output = flatten(conv2_output)  #tf.reshape(conv2_output, [-1])
-
-	# Layer 3: Fully Connected. Input = 400. Output = 120.
-	fc1_W = weight_variable(shape=(400, 120))
-	fc1_b = bias_variable(shape = [120])
-	fc1_output = tf.matmul(fc0_output, fc1_W) + fc1_b
-	# Activation.
-	fc1_output = tf.nn.relu(fc1_output)
-
-	# Layer 4: Fully Connected. Input = 120. Output = 84.
-	fc2_W = weight_variable(shape=(120, 84))
-	fc2_b = bias_variable(shape = [84])
-	fc2_output = tf.matmul(fc1_output, fc2_W) + fc2_b
-	# Activation.
-	fc2_output = tf.nn.relu(fc2_output)
-
-	# Layer 5: Fully Connected. Input = 84. Output = 10.
-	fc3_W = weight_variable(shape=(84, 3))
-	fc3_b = bias_variable(shape = [3])
-	fc3_output = tf.nn.bias_add(tf.matmul(fc2_output, fc3_W), fc3_b)
-
-	return fc3_output
-
 # encoding
 def encode(labels, indices=None, u=None):
     if(indices is None):
@@ -186,49 +141,61 @@ if test_paths is not None:
 	_, y_test = encode(listlabels_t, [np.argwhere(u == label) for label in listlabels_t], u)
 
 
-##### MODEL #####
-tf.reset_default_graph() # reset the default graph before defining a new model
+
+##### MODEL IMPORTED #####
+tf.reset_default_graph() # reset the default graph before defining a new model^M
+# Model
+new_saver = tf.train.import_meta_graph('LeNet_Adam.meta')
+graph = tf.get_default_graph()
+
 
 # Model, loss function and accuracy
 
 # tf Graph Input:  mnist data image of shape 28*28=784
-x = tf.placeholder(tf.float32, (None, 32, 32, 1), name='InputData')
+x = graph.get_tensor_by_name("InputData:0")
 # 0-9 digits recognition,  10 classes
-y = tf.placeholder(tf.int32, [None, len(u)], name='LabelData')
+y = tf.placeholder(tf.int32, [None, len(u)], name='LabelData_2')
+
 
 # Construct model and encapsulating all ops into scopes, making Tensorboard's Graph visualization more convenient
-with tf.name_scope('Model'):
+with tf.name_scope('Model_imported'):
 	# Model
-	pred = LeNet5(x)
-with tf.name_scope('Loss'):
+	out_layer4 = graph.get_tensor_by_name("Model/Relu_3:0")
+	# Layer 5: Fully Connected. Input = 84. Output = 3.
+	fc3_W = weight_variable(shape=(84, 3))
+	fc3_b = bias_variable(shape = [3])
+	pred = tf.nn.bias_add(tf.matmul(out_layer4, fc3_W), fc3_b)
+with tf.name_scope('Loss_imported'):
 	# Minimize error using cross entropy
 	cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=pred)
 	cost = tf.reduce_mean(cross_entropy)
-with tf.name_scope('Adam'):
+with tf.name_scope('Adam_imported'):
 	# Gradient Descent
-	optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cost)
-with tf.name_scope('Accuracy'):
+	optimizer = tf.train.AdamOptimizer(learning_rate, name="Adam_imported").minimize(cost)
+with tf.name_scope('Accuracy_imported'):
 	# Accuracy
 	acc = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
 	acc = tf.reduce_mean(tf.cast(acc, tf.float32))
 
-
-correct_prediction = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
-accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-saver = tf.train.Saver()
+with tf.name_scope('Prediction_imported'):
+	correct_prediction = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
+	accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 # Initializing the variables
 init = tf.global_variables_initializer()
 
 with tf.Session() as sess:
+	new_saver.restore(sess, "LeNet_Adam")
 	t0 = time.time()
 	losses, train_accs, val_accs = train(init, sess, training_epochs, batch_size, optimizer, cost)
 	t1 = time.time()
 
 	print("Training time:", t1-t0)
 
+
 	# saving model
 	#saver.save(sess, './LeNet_Adam')
+
 	#print("Model saved")
 
 	if test_paths is not None:
@@ -236,4 +203,4 @@ with tf.Session() as sess:
 		print("Accuracy:", evaluate(X_test, y_test))
 
 	if csv_out is not None:
-		export_csv(losses, train_accs, val_accs, filename=csv_out)  
+		export_csv(losses, train_accs, val_accs, filename=csv_out)

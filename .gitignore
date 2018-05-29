@@ -4,6 +4,7 @@
 *.caffemodel
 *.tfmodel
 checkpoint
+LeNet_Adam*
 ResNet-L*.ckpt
 ResNet-L*.meta
 *.ckpt*
