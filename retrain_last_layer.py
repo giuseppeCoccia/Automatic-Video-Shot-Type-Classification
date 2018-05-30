@@ -59,7 +59,7 @@ def resnet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     return images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
-def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform):
+def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform, save_models=False):
     losses, train_accs, val_accs = [], [], []
     for epoch in range(epochs):
         # shuffle dataset
@@ -100,8 +100,9 @@ def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, fe
         val_accs.append(acc_v)
 
         # save model
-        saver = tf.train.Saver()
-        saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
+        if save_models:
+        	saver = tf.train.Saver()
+        	saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
 
     return losses, train_accs, val_accs
 
@@ -201,7 +202,8 @@ if model_to_restore is None:
                                          train_op,
                                          epochs,
                                          batch_size,
-                                         transform)
+                                         transform,
+					 save_models=True)
     print("Completed training")
 else:
 	# restore model
@@ -233,7 +235,8 @@ else:
                                          train_op,
                                          epochs,
                                          batch_size,
-                                         transform)
+                                         transform,
+					 save_models=False)
 
 if csv_out is not None:
 	export_csv(losses, train_accs, val_accs, filename=csv_out)
