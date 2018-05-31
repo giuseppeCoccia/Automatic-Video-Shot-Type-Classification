@@ -119,7 +119,8 @@ parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50
 parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
 parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
 parser.add_argument('-test', nargs='+', help='paths to test directory')
-parser.add_argument('-dropout', nargs='?', type=bool, default=False, help='Use or not dropout of features going to last fully connected layer')
+parser.add_argument('-d', '--dropout', nargs='?', type=bool, default=False, help='Use or not dropout of features going to last fully connected layer')
+parser.add_argument('-s', '--save', type=bool, default=False, help='if True, save models at each epoch')
 
 args = parser.parse_args()
 train_paths = args.train
@@ -134,6 +135,7 @@ batch_size = args.batch_size
 learning_rate = args.learning_rate
 csv_out = args.csv_output
 dropout = args.dropout
+save_models = args.save
 
 
 
@@ -203,7 +205,7 @@ if model_to_restore is None:
                                          epochs,
                                          batch_size,
                                          transform,
-					 save_models=True)
+					 save_models=save_models)
     print("Completed training")
 else:
 	# restore model
@@ -236,7 +238,7 @@ else:
                                          epochs,
                                          batch_size,
                                          transform,
-					 save_models=False)
+					 save_models=save_models)
 
 if csv_out is not None:
 	export_csv(losses, train_accs, val_accs, filename=csv_out)
