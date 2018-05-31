@@ -10,9 +10,9 @@ from sklearn.utils import shuffle
 ##### UTILS #####
 # cross entropy loss, as it is a classification problem it is better
 def loss(logits, labels):
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
-    cross_entropy_mean = tf.reduce_mean(cross_entropy, name="loss")
-    
+    #cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+    #cross_entropy_mean = tf.reduce_mean(cross_entropy, name="loss")
+    cross_entropy_mean = tf.losses.sparse_softmax_cross_entropy(labels, logits)
     #regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     #loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
     loss_ = cross_entropy_mean
@@ -33,7 +33,6 @@ def resnet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     if(dropout == True):
 	    features_tensor = tf.nn.dropout(features_tensor, keep_prob=0.75)
     images = graph.get_tensor_by_name("images:0")
-
     # get avg pool dimensions
     b_size, num_units_in = features_tensor.get_shape().as_list()
 
@@ -59,40 +58,49 @@ def resnet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     return images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
-def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform, save_models=False):
+def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform, save_models=False, load_train_features=False, load_validation_features=False):
     losses, train_accs, val_accs = [], [], []
+
+    if not load_train_features:
+        # get features and optimize
+        features = sess.run(features_tensor, feed_dict={images: loaded_imgs}) # Run the ResNet on loaded images
+        # save file with avg_pool output
+        save_features(features, filename="resnet_train_features.json")
+    else:
+        features = load_features(filename="resnet_train_features.json")
+    # apply features transformation
+    #if transform == 'tanh':
+    #    features = [np.tanh(array) for array in features]
+    #elif transform == 'log1p':
+    #    features = [np.log1p(array) for array in features]
+    if not load_validation_features:
+        features_v = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
+        save_features(features_v, filename="resnet_validation_features.json")
+    else:
+        features_v = load_features(filename="resnet_validation_features.json")
+    #if transform == 'tanh':
+    #    features = [np.tanh(array) for array in features]
+    #elif transform == 'log1p':
+    #    features = [np.log1p(array) for array in features]
+         
     for epoch in range(epochs):
         # shuffle dataset
-        X_train, y_train = shuffle(loaded_imgs, indices)
+        X_train_indices, y_train = shuffle(np.arange(len(loaded_imgs)), indices)
         avg_cost = 0
         avg_acc = 0
-        total_batch = int(len(X_train)/batch_size) if (len(X_train) % batch_size) == 0 else int(len(X_train)/batch_size)+1
-        for offset in range(0, len(X_train), batch_size):
-            batch_xs, batch_ys = X_train[offset:offset+batch_size], y_train[offset:offset+batch_size]
+        total_batch = int(len(loaded_imgs)/batch_size) if (len(loaded_imgs) % batch_size) == 0 else int(len(loaded_imgs)/batch_size)+1
+        for offset in range(0, len(loaded_imgs), batch_size):
+            batch_xs_indices, batch_ys = X_train_indices[offset:offset+batch_size], y_train[offset:offset+batch_size]
             
-            # get features and optimize
-            features = sess.run(features_tensor, feed_dict={images: batch_xs}) # Run the ResNet on loaded images
-            # save file with avg_pool output
-            #save_features(features)
-            # apply features transformation
-            if transform == 'tanh':
-                features = [np.tanh(array) for array in features]
-            elif transform == 'log1p':
-                features = [np.log1p(array) for array in features]
             # run session
-            _, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features, labelsVar: batch_ys})
+            _, loss = sess.run([train_op, loss_], feed_dict={bottleneck_input: features[batch_xs_indices], labelsVar: batch_ys})
             avg_cost += loss / total_batch
             
             # get training accuracy
-            prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+            prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features[batch_xs_indices]})
             avg_acc += accuracy(batch_ys, [np.argmax(probability) for probability in prob]) / total_batch
 
-        features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
-        if transform == 'tanh':
-            features = [np.tanh(array) for array in features]
-        elif transform == 'log1p':
-            features = [np.log1p(array) for array in features]
-        prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
+        prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features_v})
         acc_v = accuracy(listlabels_v, [u[np.argmax(probability)] for probability in prob])
         print(epoch+1, ": Training Loss", avg_cost, "-Training Accuracy", avg_acc, "- Validation Accuracy", acc_v)
         losses.append(avg_cost)
@@ -152,7 +160,6 @@ for path in train_paths:
 # load images
 loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
-
 
 ### validation images
 listimgs_v, listlabels_v = [], []

@@ -11,19 +11,27 @@ def checkpoint_fn(layers):
 def meta_fn(layers):
     return 'ResNet-L%d.meta' % layers
 
-def save_features(features, filename="img_features.json"):
+def save_features(features, filename="resnet_training_features.json"):
     # save file with avg_pool output
     with open(filename, "w") as f:
-        for i in range(len(features)):
-            feats_i = features[i].tolist()
-            res = [listimgs[i], feats_i]
-            f.write(json.dumps(res) + "\n") # Print features in file "img_features.json"
+        for feature in features:
+            f.write(json.dumps(features) + "\n") # Print features in file "img_features.json"
     print('File save completed')
+
+def load_features(filename="resnet_training_features.json"):
+    features = []
+    with open(filename, "r") as f:
+        lines = f.readlines()
+        for line in lines:
+            features.append(json.loads(line))
+    return features
+
 
 # image of shape [224, 224, 3]
 # [height, width, depth]
 def load_image(path, size=224, resize=True, grayscale=False):
     img = cv2.imread(path)
+    img = cv2.normalize(img, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F, dst=None)
     #short_edge = min(img.shape[:2])
     #yy = int((img.shape[0] - short_edge) / 2)
     #xx = int((img.shape[1] - short_edge) / 2)
