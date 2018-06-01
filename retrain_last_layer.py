@@ -64,7 +64,7 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
     if not load_train_features:
         # get features and optimize
         features = sess.run(features_tensor, feed_dict={images: loaded_imgs}) # Run the ResNet on loaded images
-        # save file with avg_pool output
+	# save file with avg_pool output
         save_features(features, listimgs, filename="resnet_train_features.json")
     else:
         features = load_features(filename="resnet_train_features.json")
@@ -150,8 +150,25 @@ import_features = args.import_features
 
 ##### LOAD IMAGES ######
 
+def load_image_tensor(sess, img):
+	input_height, input_width = 224, 224
+	input_depth = 3 
+	jpeg_data = tf.placeholder(tf.string, name='DecodeJPGInput')
+	decoded_image = tf.image.decode_jpeg(jpeg_data, channels=input_depth)
+	# Convert from full range of uint8 to range [0,1] of float32.
+	decoded_image_as_float = tf.image.convert_image_dtype(decoded_image, tf.float32)
+	decoded_image_4d = tf.expand_dims(decoded_image_as_float, 0)
+	resize_shape = tf.stack([input_height, input_width])
+	resize_shape_as_int = tf.cast(resize_shape, dtype=tf.int32)
+	resized_image = tf.image.resize_bilinear(decoded_image_4d, resize_shape_as_int)
+	image_data = tf.gfile.FastGFile(img, 'rb').read()
+	resized_input_values = sess.run(resized_image,
+                                  {jpeg_data: image_data})
+	return resized_input_values
+
 ### training images
 # read images
+sess = tf.Session()
 listimgs, listlabels = [], []
 for path in train_paths:
 	imgs, labels = read_images(path)
@@ -159,7 +176,8 @@ for path in train_paths:
 	listlabels += labels
 
 # load images
-loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
+#loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
+loaded_imgs = [load_image_tensor(sess, img)[0] for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
 
 ### validation images
@@ -168,7 +186,8 @@ for path in validation_paths:
         imgs, labels = read_images(path)
         listimgs_v += imgs
         listlabels_v += labels
-loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
+#loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
+loaded_imgs_v = [load_image_tensor(sess, img)[0] for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 
 
@@ -183,7 +202,7 @@ num_categories = len(u)
 
 
 ##### MODEL #####
-sess = tf.Session()
+#sess = tf.Session()
 
 if model_to_restore is None:
     # load from existing model and retrain last layer
