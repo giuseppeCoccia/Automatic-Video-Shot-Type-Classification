@@ -2,6 +2,7 @@ import cv2
 import os
 import csv
 import json
+import numpy as np
 
 
 def checkpoint_fn(layers):
@@ -25,8 +26,9 @@ def load_features(filename="resnet_training_features.json"):
     with open(filename, "r") as f:
         lines = f.readlines()
         for line in lines:
-            features.append(json.loads(line))
-    return features
+            deserialized = json.loads(line)
+            features.append(np.array(deserialized[1]))
+    return np.array(features)
 
 
 # image of shape [224, 224, 3]
@@ -34,11 +36,6 @@ def load_features(filename="resnet_training_features.json"):
 def load_image(path, size=224, resize=True, grayscale=False):
     img = cv2.imread(path)
     img = cv2.normalize(img, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F, dst=None)
-    #short_edge = min(img.shape[:2])
-    #yy = int((img.shape[0] - short_edge) / 2)
-    #xx = int((img.shape[1] - short_edge) / 2)
-    #crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
-    #resized_img = cv2.resize(crop_img, (size, size))
     if resize == True:
     	img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
     if(grayscale):
