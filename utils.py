@@ -1,7 +1,7 @@
 import cv2
 import os
 import csv
-
+import json
 
 
 def checkpoint_fn(layers):
@@ -11,11 +11,13 @@ def checkpoint_fn(layers):
 def meta_fn(layers):
     return 'ResNet-L%d.meta' % layers
 
-def save_features(features, filename="resnet_training_features.json"):
+def save_features(features, listimgs, filename="resnet_training_features.json"):
     # save file with avg_pool output
     with open(filename, "w") as f:
-        for feature in features:
-            f.write(json.dumps(features) + "\n") # Print features in file "img_features.json"
+        for i in range(len(features)):
+            feats_i = features[i].tolist()
+            res = [listimgs[i], feats_i]
+            f.write(json.dumps(res) + "\n") # Print features in file "img_features.json"
     print('File save completed')
 
 def load_features(filename="resnet_training_features.json"):

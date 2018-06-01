@@ -58,14 +58,14 @@ def resnet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     return images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
-def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform, save_models=False, load_train_features=False, load_validation_features=False):
+def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform, save_models=False, load_train_features=False, load_validation_features=False):
     losses, train_accs, val_accs = [], [], []
 
     if not load_train_features:
         # get features and optimize
         features = sess.run(features_tensor, feed_dict={images: loaded_imgs}) # Run the ResNet on loaded images
         # save file with avg_pool output
-        save_features(features, filename="resnet_train_features.json")
+        save_features(features, listimgs, filename="resnet_train_features.json")
     else:
         features = load_features(filename="resnet_train_features.json")
     # apply features transformation
@@ -75,7 +75,7 @@ def train(sess, loaded_imgs, listlabels_v, loaded_imgs_v, indices, u, images, fe
     #    features = [np.log1p(array) for array in features]
     if not load_validation_features:
         features_v = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
-        save_features(features_v, filename="resnet_validation_features.json")
+        save_features(features_v, listimgs_v, filename="resnet_validation_features.json")
     else:
         features_v = load_features(filename="resnet_validation_features.json")
     #if transform == 'tanh':
@@ -129,6 +129,7 @@ parser.add_argument('-v', '--validation', nargs='+', help='paths to validation d
 parser.add_argument('-test', nargs='+', help='paths to test directory')
 parser.add_argument('-d', '--dropout', nargs='?', type=bool, default=False, help='Use or not dropout of features going to last fully connected layer')
 parser.add_argument('-s', '--save', type=bool, default=False, help='if True, save models at each epoch')
+parser.add_argument('-if', '--import_features', type=bool, default=False, help='if True, read features files')
 
 args = parser.parse_args()
 train_paths = args.train
@@ -144,7 +145,7 @@ learning_rate = args.learning_rate
 csv_out = args.csv_output
 dropout = args.dropout
 save_models = args.save
-
+import_features = args.import_features
 
 
 ##### LOAD IMAGES ######
@@ -195,11 +196,10 @@ if model_to_restore is None:
 
     # export meta graph
     tf.train.export_meta_graph(filename='resnet_model.meta')
-
     losses, train_accs, val_accs = train(sess,
-                                         loaded_imgs,
+                                         listimgs, loaded_imgs,
                                          listlabels_v,
-                                         loaded_imgs_v,
+                                         listimgs_v, loaded_imgs_v,
                                          indices,
                                          u,
                                          images,
@@ -212,7 +212,9 @@ if model_to_restore is None:
                                          epochs,
                                          batch_size,
                                          transform,
-					 save_models=save_models)
+					 save_models=save_models,
+					 load_train_features=import_features,
+					 load_validation_features=import_features)
     print("Completed training")
 else:
 	# restore model
@@ -230,9 +232,9 @@ else:
 	train_op = graph.get_operation_by_name("train_op")
 
 	losses, train_accs, val_accs = train(sess,
-                                         loaded_imgs,
+                                         listimgs, loaded_imgs,
                                          listlabels_v,
-                                         loaded_imgs_v,
+                                         listimgs_v, loaded_imgs_v,
                                          indices,
                                          u,
                                          images,
@@ -245,7 +247,10 @@ else:
                                          epochs,
                                          batch_size,
                                          transform,
-					 save_models=save_models)
+					 save_models=save_models,
+					 load_train_features=import_features,
+					 load_validation_features=import_features)
+
 
 if csv_out is not None:
 	export_csv(losses, train_accs, val_accs, filename=csv_out)
