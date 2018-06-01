@@ -6,6 +6,8 @@ from utils import *
 import argparse
 from sklearn.utils import shuffle
 
+import tensorflow_hub as hub
+
 
 ##### UTILS #####
 # cross entropy loss, as it is a classification problem it is better
@@ -20,42 +22,56 @@ def loss(logits, labels):
     return loss_
 
 
-def resnet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
+def create_module_graph(module_spec):
+        height, width = hub.get_expected_image_size(module_spec)
+        with tf.Graph().as_default() as graph:
+            resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3])
+            m = hub.Module(module_spec)
+            bottleneck_tensor = m(resized_input_tensor)
+            #wants_quantization = any(node.op in FAKE_QUANT_OPS for node in graph.as_graph_def().node)
+            return graph, bottleneck_tensor, resized_input_tensor
+
+
+def resnet_model(layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     # restore model
-    saver = tf.train.import_meta_graph(meta_fn(layers))
-    saver.restore(sess, checkpoint_fn(layers))
+    #saver = tf.train.import_meta_graph(meta_fn(layers))
+    #saver.restore(sess, checkpoint_fn(layers))
+    #print("Completed restoring pretrained model")
+    
+    module_spec = hub.load_module_spec("https://tfhub.dev/google/imagenet/resnet_v1_50/feature_vector/1")
+    graph, features_tensor, images = create_module_graph(module_spec)
     print("Completed restoring pretrained model")
 
+    with graph.as_default():
+        # load last-but-one (layer) tensor after feeding images
+        #graph = tf.get_default_graph()
+        #features_tensor = graph.get_tensor_by_name("avg_pool:0")
+        if(dropout == True):
+            features_tensor = tf.nn.dropout(features_tensor, keep_prob=0.75)
+        #images = graph.get_tensor_by_name("images:0")
+        # get avg pool dimensions
+        b_size, num_units_in = features_tensor.get_shape().as_list()
 
-    # load last-but-one (layer) tensor after feeding images
-    graph = tf.get_default_graph()
-    features_tensor = graph.get_tensor_by_name("avg_pool:0")
-    if(dropout == True):
-	    features_tensor = tf.nn.dropout(features_tensor, keep_prob=0.75)
-    images = graph.get_tensor_by_name("images:0")
-    # get avg pool dimensions
-    b_size, num_units_in = features_tensor.get_shape().as_list()
+        # define placeholder that will contain the inputs of the new layer
+        bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInput') # define the input tensor
+        # define placeholder for the categories
+        labelsVar = tf.placeholder(tf.int32, shape=[b_size], name='labelsVar')
 
-    # define placeholder that will contain the inputs of the new layer
-    bottleneck_input = tf.placeholder(tf.float32, shape=[b_size,num_units_in], name='BottleneckInput') # define the input tensor
-    # define placeholder for the categories
-    labelsVar = tf.placeholder(tf.int32, shape=[b_size], name='labelsVar')
+        # weights and biases
+        weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
+        weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
+        biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
 
-    # weights and biases
-    weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
-    weights = tf.get_variable('weights', shape=[num_units_in, num_categories], initializer=weights_initializer)
-    biases = tf.get_variable('biases', shape=[num_categories], initializer=tf.zeros_initializer)
+        # operations
+        logits = tf.matmul(bottleneck_input, weights)
+        logits = tf.nn.bias_add(logits, biases)
+        final_tensor = tf.nn.softmax(logits, name="final_result")
 
-    # operations
-    logits = tf.matmul(bottleneck_input, weights)
-    logits = tf.nn.bias_add(logits, biases)
-    final_tensor = tf.nn.softmax(logits, name="final_result")
+        loss_ = loss(logits, labelsVar)
+        ops = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        train_op = ops.minimize(loss_, name="train_op")
 
-    loss_ = loss(logits, labelsVar)
-    ops = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    train_op = ops.minimize(loss_, name="train_op")
-
-    return images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
+        return graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
 def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, transform, save_models=False, load_train_features=False, load_validation_features=False):
@@ -150,6 +166,9 @@ import_features = args.import_features
 
 ##### LOAD IMAGES ######
 
+layers = args.arch # model to be loaded
+graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(layers, 3, dropout)
+
 def load_image_tensor(sess, img):
 	input_height, input_width = 224, 224
 	input_depth = 3 
@@ -168,7 +187,7 @@ def load_image_tensor(sess, img):
 
 ### training images
 # read images
-sess = tf.Session()
+
 listimgs, listlabels = [], []
 for path in train_paths:
 	imgs, labels = read_images(path)
@@ -176,8 +195,8 @@ for path in train_paths:
 	listlabels += labels
 
 # load images
-#loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
-loaded_imgs = [load_image_tensor(sess, img)[0] for img in listimgs]
+loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
+#loaded_imgs = [load_image_tensor(sess, img)[0] for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
 
 ### validation images
@@ -186,8 +205,8 @@ for path in validation_paths:
         imgs, labels = read_images(path)
         listimgs_v += imgs
         listlabels_v += labels
-#loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
-loaded_imgs_v = [load_image_tensor(sess, img)[0] for img in listimgs_v]
+loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
+#loaded_imgs_v = [load_image_tensor(sess, img)[0] for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 
 
@@ -202,73 +221,69 @@ num_categories = len(u)
 
 
 ##### MODEL #####
-#sess = tf.Session()
-
-if model_to_restore is None:
-    # load from existing model and retrain last layer
-    layers = args.arch # model to be loaded
-    images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories, dropout)
-
-    # run training session
+with tf.Session(graph=graph) as sess:
     init=tf.global_variables_initializer()
     sess.run(init)
 
-    # export meta graph
-    tf.train.export_meta_graph(filename='resnet_model.meta')
-    losses, train_accs, val_accs = train(sess,
-                                         listimgs, loaded_imgs,
-                                         listlabels_v,
-                                         listimgs_v, loaded_imgs_v,
-                                         indices,
-                                         u,
-                                         images,
-                                         features_tensor,
-                                         bottleneck_input,
-                                         labelsVar,
-                                         final_tensor,
-                                         loss_,
-                                         train_op,
-                                         epochs,
-                                         batch_size,
-                                         transform,
-					 save_models=save_models,
-					 load_train_features=import_features,
-					 load_validation_features=import_features)
-    print("Completed training")
-else:
-	# restore model
-	new_saver = tf.train.import_meta_graph("resnet_model.meta")
-	new_saver.restore(sess, "resnet_model"+str(model_to_restore)+".ckpt")
-	print("Restored Model")
+    if model_to_restore is None:
+        # load from existing model and retrain last layer
 
-	graph = tf.get_default_graph()
-	features_tensor = graph.get_tensor_by_name("avg_pool:0")	
-	images = graph.get_tensor_by_name("images:0")
-	bottleneck_input = graph.get_tensor_by_name("BottleneckInput:0")
-	labelsVar = graph.get_tensor_by_name("labelsVar:0")
-	final_tensor = graph.get_tensor_by_name("final_result:0")
-	loss_ = graph.get_tensor_by_name("loss:0")
-	train_op = graph.get_operation_by_name("train_op")
+        # export meta graph
+        tf.train.export_meta_graph(filename='resnet_model.meta')
+        losses, train_accs, val_accs = train(sess,
+                                             listimgs, loaded_imgs,
+                                             listlabels_v,
+                                             listimgs_v, loaded_imgs_v,
+                                             indices,
+                                             u,
+                                             images,
+                                             features_tensor,
+                                             bottleneck_input,
+                                             labelsVar,
+                                             final_tensor,
+                                             loss_,
+                                             train_op,
+                                             epochs,
+                                             batch_size,
+                                             transform,
+                         save_models=save_models,
+                         load_train_features=import_features,
+                         load_validation_features=import_features)
+        print("Completed training")
+    else:
+        # restore model
+        new_saver = tf.train.import_meta_graph("resnet_model.meta")
+        new_saver.restore(sess, "resnet_model"+str(model_to_restore)+".ckpt")
+        print("Restored Model")
 
-	losses, train_accs, val_accs = train(sess,
-                                         listimgs, loaded_imgs,
-                                         listlabels_v,
-                                         listimgs_v, loaded_imgs_v,
-                                         indices,
-                                         u,
-                                         images,
-                                         features_tensor,
-                                         bottleneck_input,
-                                         labelsVar,
-                                         final_tensor,
-                                         loss_,
-                                         train_op,
-                                         epochs,
-                                         batch_size,
-                                         transform,
-					 save_models=save_models,
-					 load_train_features=import_features,
-					 load_validation_features=import_features)
+        graph = tf.get_default_graph()
+        features_tensor = graph.get_tensor_by_name("avg_pool:0")	
+        images = graph.get_tensor_by_name("images:0")
+        bottleneck_input = graph.get_tensor_by_name("BottleneckInput:0")
+        labelsVar = graph.get_tensor_by_name("labelsVar:0")
+        final_tensor = graph.get_tensor_by_name("final_result:0")
+        loss_ = graph.get_tensor_by_name("loss:0")
+        train_op = graph.get_operation_by_name("train_op")
+
+        losses, train_accs, val_accs = train(sess,
+                                             listimgs, loaded_imgs,
+                                             listlabels_v,
+                                             listimgs_v, loaded_imgs_v,
+                                             indices,
+                                             u,
+                                             images,
+                                             features_tensor,
+                                             bottleneck_input,
+                                             labelsVar,
+                                             final_tensor,
+                                             loss_,
+                                             train_op,
+                                             epochs,
+                                             batch_size,
+                                             transform,
+                         save_models=save_models,
+                         load_train_features=import_features,
+                         load_validation_features=import_features)
 
 
 if csv_out is not None:
