@@ -11,16 +11,10 @@ if [ -z $frames_in ]; then
 	exit 1
 fi
 
-frames=''
+basename_=$(basename $input_)
 #selected_string format: 'eq(n\,100)+eq(n\,184)+...'
-#for i in "${@:2}"
 for i in $frames_in
 do
-	frames+="eq(n\,$i)+"
+	frame="eq(n\,$i)"
+	ffmpeg -i "$input_" -vf select=$frame -vsync 0 "$output_/${basename_%.*}_$i.jpg"
 done
-
-#delete last char
-frames=${frames::-1}
-
-basename_=$(basename $input_)
-ffmpeg -i "$input_" -vf select=$frames -vsync 0 "$output_/${basename_%.*}_%d.jpg"
