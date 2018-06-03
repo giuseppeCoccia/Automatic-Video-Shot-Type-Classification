@@ -234,6 +234,7 @@ if __name__ == '__main__':
             print("PROB:", prob)
             print([u[np.argmax(probability)] for probability in prob])
             print("Accuracy:", accuracy(listlabels_t, [u[np.argmax(probability)] for probability in prob]))
+            export_predictions(listimgs_t, [u[np.argmax(probability)] for probability in prob])
 
 
     if csv_out is not None:

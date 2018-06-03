@@ -30,6 +30,13 @@ def load_features(filename="resnet_training_features.json"):
             features.append(np.array(deserialized[1]))
     return np.array(features)
 
+def export_predictions(listimages, predictions, filename="resnet_test_predictions.csv"):
+    with open(filename, "w") as f:
+        writer = csv.writer(f, delimiter=';')
+        for img, pred in zip(listimages, predictions):
+            writer.writerow([img, pred])
+    print("Predictions written")
+
 
 # image of shape [224, 224, 3]
 # [height, width, depth]
