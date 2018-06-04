@@ -26,10 +26,9 @@ def senet_model(sess, layers, num_categories, dropout, FC_WEIGHT_STDDEV=0.01):
     saver.restore(sess, "se_resnext101.ckpt")
     print("Completed restoring pretrained model")
 
-
     # load last-but-one (layer) tensor after feeding images
     graph = tf.get_default_graph()
-    features_tensor = graph.get_tensor_by_name("dense/BiasAdd:0")
+    features_tensor = graph.get_tensor_by_name("flatten/Reshape:0")
     if(dropout == True):
 	    features_tensor = tf.nn.dropout(features_tensor, keep_prob=0.75)
     images = graph.get_tensor_by_name("input_placeholder:0")
@@ -63,8 +62,11 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
 
     if not load_train_features:
         # get features and optimize
-        features = sess.run(features_tensor, feed_dict={images: loaded_imgs}) # Run the ResNet on loaded images
-	# save file with avg_pool output
+        features = []
+        for i in range(0, 1200, 200):
+            features.extend(sess.run(features_tensor, feed_dict={images: loaded_imgs[i: i+200]})) # Run the ResNet on loaded images
+        features = np.array(features)
+        # save file with avg_pool output
         save_features(features, listimgs, filename="resnet_train_features.json")
     else:
         features = load_features(filename="resnet_train_features.json")
@@ -120,7 +122,7 @@ parser = argparse.ArgumentParser(description="Script for retraining last layer o
 parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
 parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
 parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='epoch number of the model to be restored')
-parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=32, help='batch size for training batches')
+parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=8, help='batch size for training batches')
 parser.add_argument('-e', '--epochs', nargs='?', type=int, default=20, help='number of epochs')
 parser.add_argument('-transform', '--transformation', nargs='?', type=str, default='tanh', choices=['tanh', 'log1p'], help='transformation to be used on the features')
 parser.add_argument('-a', '--arch', nargs='?', type=int, default=50, choices=[50, 152], help='chose pretrained model')
@@ -176,8 +178,8 @@ for path in train_paths:
 	listlabels += labels
 
 # load images
-#loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
-loaded_imgs = [load_image_tensor(sess, img)[0] for img in listimgs]
+loaded_imgs = [load_image(img).reshape((3, 224, 224)) for img in listimgs]
+#loaded_imgs = [load_image_tensor(sess, img)[0] for img in listimgs]
 print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
 
 ### validation images
@@ -186,8 +188,8 @@ for path in validation_paths:
         imgs, labels = read_images(path)
         listimgs_v += imgs
         listlabels_v += labels
-#loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
-loaded_imgs_v = [load_image_tensor(sess, img)[0] for img in listimgs_v]
+loaded_imgs_v = [load_image(img).reshape((3, 224, 224)) for img in listimgs_v]
+#loaded_imgs_v = [load_image_tensor(sess, img)[0] for img in listimgs_v]
 print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 
 
@@ -207,14 +209,15 @@ num_categories = len(u)
 if model_to_restore is None:
     # load from existing model and retrain last layer
     layers = args.arch # model to be loaded
-    images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(sess, layers, num_categories, dropout)
+    images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = senet_model(sess, layers, num_categories, dropout)
+
 
     # run training session
     init=tf.global_variables_initializer()
     sess.run(init)
 
     # export meta graph
-    tf.train.export_meta_graph(filename='resnet_model.meta')
+    tf.train.export_meta_graph(filename='senet_model.meta')
     losses, train_accs, val_accs = train(sess,
                                          listimgs, loaded_imgs,
                                          listlabels_v,
@@ -286,7 +289,7 @@ if test_paths is not None:
 		imgs, labels = read_images(path)
 		listimgs_t += imgs
 		listlabels_t += labels
-	loaded_imgs_t = [load_image(img).reshape((224, 224, 3)) for img in listimgs_t]
+	loaded_imgs_t = [load_image(img).reshape((3, 224, 224)) for img in listimgs_t]
 	print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')	
 	
 	# test
