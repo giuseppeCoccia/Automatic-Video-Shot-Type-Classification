@@ -31,9 +31,8 @@ def create_module_graph(module_spec):
             return graph, bottleneck_tensor, resized_input_tensor
 
 
-def resnet_model(num_categories, dropout, module_hub, FC_WEIGHT_STDDEV=0.01):
+def resnet_model(num_categories, dropout, module_spec, FC_WEIGHT_STDDEV=0.01):
     # restore model
-    module_spec = hub.load_module_spec(module_hub)
     graph, features_tensor, images = create_module_graph(module_spec)
     print("Model restored")
 
@@ -152,6 +151,9 @@ if __name__ == '__main__':
 
 
     ##### LOAD IMAGES ######
+    
+    module_spec = hub.load_module_spec(tfhub)
+    height, width = hub.get_expected_image_size(module_spec)
 
     ### training images
     # read images
@@ -162,7 +164,7 @@ if __name__ == '__main__':
         listlabels += labels
 
     # load images
-    loaded_imgs = [load_image(img).reshape((224, 224, 3)) for img in listimgs]
+    loaded_imgs = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs]
     print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
 
     ### validation images
@@ -171,7 +173,7 @@ if __name__ == '__main__':
             imgs, labels = read_images(path)
             listimgs_v += imgs
             listlabels_v += labels
-    loaded_imgs_v = [load_image(img).reshape((224, 224, 3)) for img in listimgs_v]
+    loaded_imgs_v = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs_v]
     print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 
 
@@ -188,7 +190,7 @@ if __name__ == '__main__':
     ##### MODEL #####
 
     # define model
-    graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(num_categories, dropout, tfhub)
+    graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(num_categories, dropout, module_spec)
 
     with tf.Session(graph=graph) as sess:
         init=tf.global_variables_initializer()
@@ -225,7 +227,7 @@ if __name__ == '__main__':
                 imgs, labels = read_images(path)
                 listimgs_t += imgs
                 listlabels_t += labels
-            loaded_imgs_t = [load_image(img).reshape((224, 224, 3)) for img in listimgs_t]
+            loaded_imgs_t = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs_t]
             print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 
             # test
