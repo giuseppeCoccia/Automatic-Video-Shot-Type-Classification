@@ -110,9 +110,12 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
         val_accs.append(acc_v)
 
         # save model
-        if save_models:
+        if save_models == 2:
         	saver = tf.train.Saver()
         	saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
+    if save_models == 1:
+        saver = tf.train.Saver()
+        saver.save(sess, "resnet_model.ckpt")
 
     return losses, train_accs, val_accs
 
@@ -125,12 +128,12 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='epoch number of the model to be restored')
     parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=128, help='batch size for training batches')
     parser.add_argument('-e', '--epochs', nargs='?', type=int, default=80, help='number of epochs')
-    parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v1_50/feature_vector/1', help='TensorFlow Hub module to use')
+    parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/1', help='TensorFlow Hub module to use')
     parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
     parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
     parser.add_argument('-test', nargs='+', help='paths to test directory')
     parser.add_argument('-d', '--dropout', nargs='?', type=bool, default=False, help='Use or not dropout of features going to last fully connected layer')
-    parser.add_argument('-s', '--save', type=bool, default=False, help='if True, save models at each epoch')
+    parser.add_argument('-s', '--save', type=int, default=0, choices=[0, 1, 2], help='if 1 save model once at the end of the training. if 2 save model at each epocs')
     parser.add_argument('-if', '--import_features', help='if True read features files instead of generating them', action='store_true')
 
     args = parser.parse_args()
