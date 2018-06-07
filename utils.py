@@ -19,7 +19,7 @@ def save_features(features, listimgs, filename="resnet_training_features.json"):
             feats_i = features[i].tolist()
             res = [listimgs[i], feats_i]
             f.write(json.dumps(res) + "\n") # Print features in file "img_features.json"
-    print('File save completed')
+    print(filename, "saved")
 
 def load_features(filename="resnet_training_features.json"):
     features = []
@@ -28,6 +28,7 @@ def load_features(filename="resnet_training_features.json"):
         for line in lines:
             deserialized = json.loads(line)
             features.append(np.array(deserialized[1]))
+    print(filename, "loaded")
     return np.array(features)
 
 def export_predictions(listimages, predictions, filename="resnet_test_predictions.csv"):

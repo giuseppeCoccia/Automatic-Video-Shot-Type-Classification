@@ -66,10 +66,9 @@ def resnet_model(num_categories, dropout, module_spec, FC_WEIGHT_STDDEV=0.01):
         return graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
-def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, save_models=False, load_train_features=False, load_validation_features=False):
+def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, save_models, load_train_features=False, load_validation_features=False):
     losses, train_accs, val_accs = [], [], []
 
-    # features
     # training
     if not load_train_features:
         # get features and optimize
@@ -86,14 +85,17 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
     else:
         features_v = load_features(filename="resnet_validation_features.json")
 
+#   idx = np.random.choice(311, 10, replace=False)
+#   features = np.concatenate((features[:311][idx], features[311:622][idx], features[622:][idx]))
+#   indices = np.concatenate((indices[:311][idx], indices[311:622][idx], indices[622:][idx]))
     # training
     for epoch in range(epochs):
         # shuffle dataset
-        X_train_indices, y_train = shuffle(np.arange(len(loaded_imgs)), indices)
+        X_train_indices, y_train = shuffle(np.arange(len(features)), indices)
         avg_cost = 0
         avg_acc = 0
-        total_batch = int(len(loaded_imgs)/batch_size) if (len(loaded_imgs) % batch_size) == 0 else int(len(loaded_imgs)/batch_size)+1
-        for offset in range(0, len(loaded_imgs), batch_size):
+        total_batch = int(len(features)/batch_size) if (len(features) % batch_size) == 0 else int(len(features)/batch_size)+1
+        for offset in range(0, len(features), batch_size):
             batch_xs_indices, batch_ys = X_train_indices[offset:offset+batch_size], y_train[offset:offset+batch_size]
             
             # run session
@@ -113,8 +115,8 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
 
         # save model
         if save_models == 2:
-        	saver = tf.train.Saver()
-        	saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
+            saver = tf.train.Saver()
+            saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
     if save_models == 1:
         saver = tf.train.Saver()
         saver.save(sess, "./resnet_model.ckpt")
@@ -127,9 +129,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script for retraining last layer of the resnet architecture")
     parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
     parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
+    parser.add_argument('-pred', '--prediction_output', nargs='?', type=str, help='name of the output csv file for the predictions on the test set, file is not saved otherwise')
     parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='epoch number of the model to be restored')
     parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=128, help='batch size for training batches')
-    parser.add_argument('-e', '--epochs', nargs='?', type=int, default=80, help='number of epochs')
+    parser.add_argument('-e', '--epochs', nargs='?', type=int, default=100, help='number of epochs')
     parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/1', help='TensorFlow Hub module to use')
     parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
     parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
@@ -149,6 +152,7 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     csv_out = args.csv_output
+    pred_out = args.prediction_output
     dropout = args.dropout
     save_models = args.save
     import_features = args.import_features
@@ -236,12 +240,21 @@ if __name__ == '__main__':
             print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 
             # test
-            features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_t})
+            if not import_features:
+                # get features and save
+                features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_t})
+                save_features(features, listimgs, filename="resnet_test_features.json")
+            else:
+                features = load_features(filename="resnet_test_features.json")
+
+
+
             prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
             print("PROB:", prob)
             print([u[np.argmax(probability)] for probability in prob])
-            print("Accuracy:", accuracy(listlabels_t, [u[np.argmax(probability)] for probability in prob]))
-            export_predictions(listimgs_t, [u[np.argmax(probability)] for probability in prob])
+            print("Test accuracy:", accuracy(listlabels_t, [u[np.argmax(probability)] for probability in prob]))
+            if pred_out is not None:
+                export_predictions(listimgs_t, [u[np.argmax(probability)] for probability in prob], filename=pred_out)
 
 
     if csv_out is not None:
