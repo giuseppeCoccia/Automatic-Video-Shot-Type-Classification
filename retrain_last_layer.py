@@ -28,6 +28,8 @@ def create_module_graph(module_spec):
             resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3], name="ImageInput")
             m = hub.Module(module_spec)
             bottleneck_tensor = m(resized_input_tensor)
+                #for op in graph.get_operations():
+                #print(str(op.name))
             return graph, bottleneck_tensor, resized_input_tensor
 
 
@@ -115,7 +117,7 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
         	saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
     if save_models == 1:
         saver = tf.train.Saver()
-        saver.save(sess, "resnet_model.ckpt")
+        saver.save(sess, "./resnet_model.ckpt")
 
     return losses, train_accs, val_accs
 
@@ -128,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='epoch number of the model to be restored')
     parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=128, help='batch size for training batches')
     parser.add_argument('-e', '--epochs', nargs='?', type=int, default=80, help='number of epochs')
-    parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/1', help='TensorFlow Hub module to use')
+    parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/1', help='TensorFlow Hub module to use')
     parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
     parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
     parser.add_argument('-test', nargs='+', help='paths to test directory')

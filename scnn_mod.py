@@ -214,19 +214,16 @@ saver = tf.train.Saver()
 init = tf.global_variables_initializer()
 
 with tf.Session() as sess:
-	t0 = time.time()
-	losses, train_accs, val_accs = train(init, sess, training_epochs, batch_size, optimizer, cost)
-	t1 = time.time()
+    t0 = time.time()
+    losses, train_accs, val_accs = train(init, sess, training_epochs, batch_size, optimizer, cost)
+    t1 = time.time()
 
-	print("Training time:", t1-t0)
+    print("Training time:", t1-t0)
 
-	# saving model
-	#saver.save(sess, './LeNet_Adam')
-	#print("Model saved")
 
-	if test_paths is not None:
-		# Test model
-		print("Accuracy:", evaluate(X_test, y_test))
+    if test_paths is not None:
+        # Test model
+        print("Accuracy:", evaluate(X_test, y_test))
 
-	if csv_out is not None:
-                export_csv(losses, train_accs, val_accs, filename=csv_out)
+    if csv_out is not None:
+        export_csv(losses, train_accs, val_accs, filename=csv_out)
