@@ -39,9 +39,18 @@ def export_predictions(listimages, predictions, filename="resnet_test_prediction
     print("Predictions written")
 
 
-# image of shape [224, 224, 3]
+def parse_input(paths):
+    # read images
+    listimgs, listlabels = [], []
+    paths = [paths[0]+d for d in os.listdir(paths[0]) if os.path.isdir(paths[0]+"/"+d)] if len(paths) == 1 else paths
+    for path in paths:
+        imgs, labels = read_images(path)
+        listimgs += imgs
+        listlabels += labels
+    return listimgs, listlabels
+
 # [height, width, depth]
-def load_image(path, size=224, resize=True, grayscale=False):
+def load_image(path, size, resize=True, grayscale=False):
     img = cv2.imread(path)
     img = cv2.normalize(img, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F, dst=None)
     if resize == True:

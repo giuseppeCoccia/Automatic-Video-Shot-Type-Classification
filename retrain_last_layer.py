@@ -18,19 +18,19 @@ def loss(logits, labels):
     #regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     #loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
     loss_ = cross_entropy_mean
-    
     return loss_
 
 
 def create_module_graph(module_spec):
-        height, width = hub.get_expected_image_size(module_spec)
-        with tf.Graph().as_default() as graph:
-            resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3], name="ImageInput")
-            m = hub.Module(module_spec)
-            bottleneck_tensor = m(resized_input_tensor)
-                #for op in graph.get_operations():
-                #print(str(op.name))
-            return graph, bottleneck_tensor, resized_input_tensor
+    height, width = hub.get_expected_image_size(module_spec)
+    with tf.Graph().as_default() as graph:
+        resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3], name="ImageInput")
+        m = hub.Module(module_spec)
+        bottleneck_tensor = m(resized_input_tensor)
+        #for op in graph.get_operations():
+            #print(str(op.name))
+        return graph, bottleneck_tensor, resized_input_tensor
+
 
 
 def resnet_model(num_categories, dropout, module_spec, FC_WEIGHT_STDDEV=0.01):
@@ -72,7 +72,10 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
     # training
     if not load_train_features:
         # get features and optimize
-        features = sess.run(features_tensor, feed_dict={images: loaded_imgs}) # Run the ResNet on loaded images
+        features = []
+        for i in range(0, len(loaded_imgs), 200): # go with batches of 200 for loading features
+            features.extend(sess.run(features_tensor, feed_dict={images: loaded_imgs[i: i+200]})) # Run the ResNet on loaded images
+        features = np.array(features)
         # save file with avg_pool output
         save_features(features, listimgs, filename="resnet_train_features.json")
     else:
@@ -80,7 +83,10 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
 
     # validation
     if not load_validation_features:
-        features_v = sess.run(features_tensor, feed_dict = {images: loaded_imgs_v})
+        features_v = []
+        for i in range(0, len(loaded_imgs_v), 200): # go with batches of 200 for loading features
+            features_v.extend(sess.run(features_tensor, feed_dict={images: loaded_imgs_v[i: i+200]})) # Run the ResNet on loaded images
+        features_v = np.array(features_v)
         save_features(features_v, listimgs_v, filename="resnet_validation_features.json")
     else:
         features_v = load_features(filename="resnet_validation_features.json")
@@ -116,7 +122,7 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
         # save model
         if save_models == 2:
             saver = tf.train.Saver()
-            saver.save(sess, "resnet_model"+str(epoch+1)+".ckpt")
+            saver.save(sess, "./resnet_model"+str(epoch+1)+".ckpt")
     if save_models == 1:
         saver = tf.train.Saver()
         saver.save(sess, "./resnet_model.ckpt")
@@ -130,7 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
     parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
     parser.add_argument('-pred', '--prediction_output', nargs='?', type=str, help='name of the output csv file for the predictions on the test set, file is not saved otherwise')
-    parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='epoch number of the model to be restored')
+    parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='restore model at a specific epoch')
     parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=128, help='batch size for training batches')
     parser.add_argument('-e', '--epochs', nargs='?', type=int, default=100, help='number of epochs')
     parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/1', help='TensorFlow Hub module to use')
@@ -160,29 +166,20 @@ if __name__ == '__main__':
 
 
     ##### LOAD IMAGES ######
-    
     module_spec = hub.load_module_spec(tfhub)
     height, width = hub.get_expected_image_size(module_spec)
+    channels = hub.get_num_image_channels(module_spec)
 
     ### training images
-    # read images
-    listimgs, listlabels = [], []
-    for path in train_paths:
-        imgs, labels = read_images(path)
-        listimgs += imgs
-        listlabels += labels
-
+    # read paths and labels for each image
+    listimgs, listlabels = parse_input(train_paths)
     # load images
-    loaded_imgs = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs]
+    loaded_imgs = [load_image(img, size=height).reshape((height, width, channels)) for img in listimgs]
     print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
 
     ### validation images
-    listimgs_v, listlabels_v = [], []
-    for path in validation_paths:
-            imgs, labels = read_images(path)
-            listimgs_v += imgs
-            listlabels_v += labels
-    loaded_imgs_v = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs_v]
+    listimgs_v, listlabels_v = parse_input(validation_paths)
+    loaded_imgs_v = [load_image(img, size=height).reshape((height, width, channels)) for img in listimgs_v]
     print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
 
 
@@ -190,8 +187,6 @@ if __name__ == '__main__':
     u,indices = np.unique(np.array(listlabels), return_inverse=True)
     print('Categories: ', u)
     num_categories = len(u)
-
-
 
 
 
@@ -231,22 +226,20 @@ if __name__ == '__main__':
         #### TEST ####
         if test_paths is not None:
             # read images
-            listimgs_t, listlabels_t = [], []
-            for path in test_paths:
-                imgs, labels = read_images(path)
-                listimgs_t += imgs
-                listlabels_t += labels
+            listimgs_t, listlabels_t = parse_input(test_paths)
             loaded_imgs_t = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs_t]
             print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
 
             # test
             if not import_features:
                 # get features and save
-                features = sess.run(features_tensor, feed_dict = {images: loaded_imgs_t})
-                save_features(features, listimgs, filename="resnet_test_features.json")
+                features = []
+                for i in range(0, len(loaded_imgs_t), 200): # go with batches of 200 for loading features
+                    features.extend(sess.run(features_tensor, feed_dict={images: loaded_imgs_t[i: i+200]})) # Run the ResNet on loaded images
+                features = np.array(features)
+                save_features(features, listimgs_t, filename="resnet_test_features.json")
             else:
                 features = load_features(filename="resnet_test_features.json")
-
 
 
             prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
