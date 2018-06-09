@@ -3,13 +3,12 @@ import os
 import subprocess
 
 if(len(sys.argv) < 3):
-	print("Usage: python3 parse_video_info.py path_to_video(no extention) mode")
-	print("Mode: -gros_plan (face area > 0.25% of frame area)")
-	print("Mode: -plan_moyen (face on the frame's head)")
-	exit()
+	print("Usage: python3 parse_video_info.py path_to_video mode")
+	exit(1)
 
-file_ = sys.argv[1]+"_faces.txt"
-video_ = sys.argv[1]+".mp4"
+video_ = sys.argv[1]
+filename, _ = os.path.splitext(sys.argv[1])
+file_ = filename+"_faces.txt"
 mode = sys.argv[2]
 
 

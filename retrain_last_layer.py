@@ -33,11 +33,7 @@ def create_module_graph(module_spec):
 
 
 
-def resnet_model(num_categories, dropout, module_spec, FC_WEIGHT_STDDEV=0.01):
-    # restore model
-    graph, features_tensor, images = create_module_graph(module_spec)
-    print("Model restored")
-
+def resnet_model(num_categories, dropout, graph, features_tensor, images, FC_WEIGHT_STDDEV=0.01):
     with graph.as_default():
         if(dropout == True):
             features_tensor = tf.nn.dropout(features_tensor, keep_prob=0.75)
@@ -63,7 +59,7 @@ def resnet_model(num_categories, dropout, module_spec, FC_WEIGHT_STDDEV=0.01):
         ops = tf.train.AdamOptimizer(learning_rate=learning_rate)
         train_op = ops.minimize(loss_, name="train_op")
 
-        return graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op
+        return bottleneck_input, labelsVar, final_tensor, loss_, train_op
 
 
 def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, indices, u, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op, epochs, batch_size, save_models, load_train_features=False, load_validation_features=False):
@@ -126,6 +122,8 @@ def train(sess, listimgs, loaded_imgs, listlabels_v, listimgs_v, loaded_imgs_v, 
     if save_models == 1:
         saver = tf.train.Saver()
         saver.save(sess, "./resnet_model.ckpt")
+    if save_models != 0:
+        tf.train.export_meta_graph(filename="resnet_model.meta")
 
     return losses, train_accs, val_accs
 
@@ -136,22 +134,23 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', nargs='?', type=float, default=0.001, help='learning rate to be used')
     parser.add_argument('-csv', '--csv_output', nargs='?', type=str, help='name of the output csv file for the loss and accuracy, file is not saved otherwise')
     parser.add_argument('-pred', '--prediction_output', nargs='?', type=str, help='name of the output csv file for the predictions on the test set, file is not saved otherwise')
-    parser.add_argument('-m', '--model_epoch', nargs='?', type=int, help='restore model at a specific epoch')
     parser.add_argument('-bs', '--batch_size', nargs='?', type=int, default=128, help='batch size for training batches')
     parser.add_argument('-e', '--epochs', nargs='?', type=int, default=100, help='number of epochs')
-    parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/1', help='TensorFlow Hub module to use')
     parser.add_argument('-t', '--train', nargs='+', help='paths to training directories', required=True)
     parser.add_argument('-v', '--validation', nargs='+', help='paths to validation directory', required=True)
     parser.add_argument('-test', nargs='+', help='paths to test directory')
     parser.add_argument('-d', '--dropout', nargs='?', type=bool, default=False, help='Use or not dropout of features going to last fully connected layer')
     parser.add_argument('-s', '--save', type=int, default=0, choices=[0, 1, 2], help='if 1 save model once at the end of the training. if 2 save model at each epocs')
     parser.add_argument('-if', '--import_features', help='if True read features files instead of generating them', action='store_true')
+    command_group = parser.add_mutually_exclusive_group()
+    command_group.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/1', help='TensorFlow Hub module to use')
+    command_group.add_argument('-model', '--model', type=str, help='restore given model (no exention, just model name)')
 
     args = parser.parse_args()
     train_paths = args.train
     validation_paths = args.validation
     test_paths = args.test
-    model_to_restore = args.model_epoch
+    model_to_restore = args.model
 
     # train params
     epochs = args.epochs
@@ -166,9 +165,12 @@ if __name__ == '__main__':
 
 
     ##### LOAD IMAGES ######
-    module_spec = hub.load_module_spec(tfhub)
-    height, width = hub.get_expected_image_size(module_spec)
-    channels = hub.get_num_image_channels(module_spec)
+    if tfhub != None:
+        module_spec = hub.load_module_spec(tfhub)
+        height, width = hub.get_expected_image_size(module_spec)
+        channels = hub.get_num_image_channels(module_spec)
+    else:
+        height, width, channels = 224, 224, 3
 
     ### training images
     # read paths and labels for each image
@@ -176,38 +178,38 @@ if __name__ == '__main__':
     # load images
     loaded_imgs = [load_image(img, size=height).reshape((height, width, channels)) for img in listimgs]
     print('[TRAINING] Loaded', len(loaded_imgs), 'images and', len(listlabels), 'labels')
+    # map string labels to unique integers
+    u,indices = np.unique(np.array(listlabels), return_inverse=True)
+    print('[TRAINING] Categories: ', u)
+    num_categories = len(u)
 
     ### validation images
     listimgs_v, listlabels_v = parse_input(validation_paths)
     loaded_imgs_v = [load_image(img, size=height).reshape((height, width, channels)) for img in listimgs_v]
     print('[VALIDATION] Loaded', len(loaded_imgs_v), 'images and', len(listlabels_v), 'labels')
-
-
-    # map string labels to unique integers
-    u,indices = np.unique(np.array(listlabels), return_inverse=True)
-    print('Categories: ', u)
-    num_categories = len(u)
-
-
+    listlabels_v = [x if x in u else 'Unknown' for x in listlabels_v]
+    u_v = np.unique(np.array(listlabels_v))
+    print('[VALIDATION] Categories: ', u_v)
 
 
     ##### MODEL #####
+    # restore model
+    if tfhub != None:
+        graph, features_tensor, images = create_module_graph(module_spec)
+    else:
+        saver = tf.train.import_meta_graph(model_to_restore+".meta")
+        saver.restore(sess, model_to_restore+".ckpt")
+        graph = tf.get_default_graph()
+        features_tensor = graph.get_tensor_by_name("avg_pool:0")
+        images = graph.get_tensor_by_name("images:0")
 
-    # define model
-    graph, images, features_tensor, bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(num_categories, dropout, module_spec)
+    print("Model restored")
+    # define new layer
+    bottleneck_input, labelsVar, final_tensor, loss_, train_op = resnet_model(num_categories, dropout, graph, features_tensor, images)
 
     with tf.Session(graph=graph) as sess:
         init=tf.global_variables_initializer()
         sess.run(init)
-
-        if model_to_restore is None:
-            # export meta graph
-            tf.train.export_meta_graph(filename='resnet_model.meta')
-        else:
-            # restore model
-            saver = tf.train.Saver()
-            saver.restore(sess, "resnet_model"+str(model_to_restore)+".ckpt")
-            print("Restored Model")
 
         # run training
         losses, train_accs, val_accs = train(sess, listimgs, loaded_imgs,
@@ -227,19 +229,16 @@ if __name__ == '__main__':
         if test_paths is not None:
             # read images
             listimgs_t, listlabels_t = parse_input(test_paths)
-            loaded_imgs_t = [load_image(img, size=height).reshape((height, width, 3)) for img in listimgs_t]
+            loaded_imgs_t = [load_image(img, size=height).reshape((height, width, channels)) for img in listimgs_t]
             print('[TEST] Loaded', len(loaded_imgs_t), 'images and', len(listlabels_t), 'labels')
+            listlabels_t = [x if x in u else 'Unknown' for x in listlabels_t]
+            u_t = np.unique(np.array(listlabels_t))
+            print('[TEST] Categories: ', u_t)
 
-            # test
-            if not import_features:
-                # get features and save
-                features = []
-                for i in range(0, len(loaded_imgs_t), 200): # go with batches of 200 for loading features
-                    features.extend(sess.run(features_tensor, feed_dict={images: loaded_imgs_t[i: i+200]})) # Run the ResNet on loaded images
-                features = np.array(features)
-                save_features(features, listimgs_t, filename="resnet_test_features.json")
-            else:
-                features = load_features(filename="resnet_test_features.json")
+            features = []
+            for i in range(0, len(loaded_imgs_t), 200): # go with batches of 200 for loading features
+                features.extend(sess.run(features_tensor, feed_dict={images: loaded_imgs_t[i: i+200]})) # Run the ResNet on loaded images
+            features = np.array(features)
 
 
             prob = sess.run(final_tensor, feed_dict = {bottleneck_input: features})
