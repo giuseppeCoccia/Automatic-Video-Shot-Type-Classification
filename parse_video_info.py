@@ -1,8 +1,6 @@
 import sys
 import os
 import subprocess
-import argparse
-
 
 if(len(sys.argv) < 3):
 	print("Usage: python3 parse_video_info.py path_to_video(no extention) mode")
@@ -60,13 +58,13 @@ def on_center(coordinates, b, h, n_split=3, large_split=True, h_ratio_limit=0.4)
 #### MAIN ###
 
 # read video dimensions first
-cmd_ = "./get_video_resolution.sh "+video_
+cmd_ = "./get_video_info.sh "+video_
 p = subprocess.Popen(cmd_ , shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 stdout, stderr = p.communicate()
-dim = stdout.strip().split("x") # dim[0] = b, dim[1] = h
+dim = stdout.strip().split("\n") # dim[0] = b, dim[1] = h
+
 # parse input file
 frames = {}
-
 with open(file_, "r") as f:
 	for line in f:
 		words = line.split()
@@ -84,8 +82,9 @@ with open(file_, "r") as f:
 			frames[frame] = [(x_top, y_top, x_down, y_down)]
 		else:
 			frames[frame].append((x_top, y_top, x_down, y_down))
+
 old_key = -1
-frms = {'plan_moyen':[], 'plan_rapproche':[], 'plan_americain':[], 'gros_plan':[], 'plan_large':[]}
+frms = {'plan_moyen':[], 'plan_rapproche':[], 'plan_americain':[], 'gros_plan':[], 'plan_large':[], 'other':[], 'unknown':[i for i in range(int(dim[2])) if i not in frames.keys() and i % 25 == 0]}
 for key, value in sorted(frames.items()):
 	if(old_key == -1): old_key = key
 	elif(key < old_key+20): continue
@@ -102,16 +101,20 @@ for key, value in sorted(frames.items()):
 		elif ratio > 0.05 and ratio < 0.06 and coordinates[3] < 384-130 and coordinates[3] > 384-220:
 			frms['plan_rapproche'].append(key)
 		# PLAN AMERICAIN (0.01 and 0.03) -> 
-		elif ratio > 0.02 and ratio < 0.027 and coordinates[3] < 384-160:# and coordinates[3] > 384-220:
-			frms['plan_americain'].append(key)
+		#elif ratio > 0.02 and ratio < 0.027 and coordinates[3] < 384-160:# and coordinates[3] > 384-220:
+		#	frms['plan_americain'].append(key)
 		# PLAN LARGE (0 and 0.006)
-		elif ratio < 0.006 and ratio >= 0:
-			frms['plan_large'].append(key)
-		else: continue #if not chosen, do not update key
+		#elif ratio < 0.006 and ratio >= 0:
+		#	frms['plan_large'].append(key)
+		else:
+			frms['other'].append(key)
+			continue #if not chosen, do not update key
 	else:
-		coordinates = value[0]
-		ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
-		if ratio >= 0 and ratio < 0.006:
-			frms['plan_large'].append(key)
+		#coordinates = value[0]
+		#ratio = area_ratio(abs(coordinates[2]-coordinates[0]), abs(coordinates[1]-coordinates[3]), int(dim[0]), int(dim[1]))
+		#if ratio >= 0 and ratio < 0.006:
+		#	frms['plan_large'].append(key)
+		frms['other'].append(key)
+		
 	old_key = key
 print(" ".join(str(x) for x in frms[mode]))
