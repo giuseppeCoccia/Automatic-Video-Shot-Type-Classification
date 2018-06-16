@@ -42,7 +42,11 @@ def export_predictions(listimages, predictions, filename="resnet_test_prediction
 def parse_input(paths):
     # read images
     listimgs, listlabels = [], []
-    paths = [paths[0]+d for d in os.listdir(paths[0]) if os.path.isdir(paths[0]+"/"+d)] if len(paths) == 1 else paths
+    subpaths = []
+    for path in paths:
+        subpaths.extend([path+d for d in os.listdir(path) if os.path.isdir(path+"/"+d)])
+    if(len(subpaths) > 0):
+        paths = subpaths
     for path in paths:
         imgs, labels = read_images(path)
         listimgs += imgs

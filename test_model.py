@@ -12,7 +12,7 @@ parser.add_argument('test', nargs='+', help='path to test directory')
 parser.add_argument('-c', '--categories', nargs='+', default=['Gros plan', 'Plan moyen', 'Plan rapproche', 'Unknown'], help='categories to test on')
 parser.add_argument('-hub', '--tfhub_module', type=str, default='https://tfhub.dev/google/imagenet/resnet_v2_152/feature_vector/1', help='TensorFlow Hub module to use for getting informations about the architecture (height and width of the input)')
 parser.add_argument('-pred', '--prediction_output', nargs='?', type=str, help='name of the output csv file for the predictions on the test set, file is not saved otherwise')
-parser.add_argument('-model', '--model', type=str, help='restore given model')
+parser.add_argument('-model', '--model', type=str, help='restore given model', required=True)
 
 args = parser.parse_args()
 test_paths = args.test
