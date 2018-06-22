@@ -48,7 +48,7 @@ for k, v in videoframes.items():
 	while(vid_in.isOpened() & frame<vid_frames):
 		ret, image = vid_in.read()
 		if ret==True:
-			if frame in v:
+			if frame in v and v[frame] != 'Unknown':
 				print("Writing", v[frame], "on frame", frame, "for", k)
 				font  = cv2.FONT_HERSHEY_SIMPLEX
 				cv2.putText(image, v[frame], (10, he-20), font, 1, (255,255,255), 2)
